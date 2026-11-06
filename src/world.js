@@ -406,3 +406,4 @@ export function buildStageWorld(scene, stageData) {
     startPt,
   };
 }
+

@@ -850,3 +850,4 @@ loadStage(0);
 state.mode = 'intro';
 modalOverlayEl.classList.remove('hidden');
 requestAnimationFrame(gameLoop);
+

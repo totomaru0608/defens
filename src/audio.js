@@ -96,3 +96,4 @@ class SoundEffects {
 }
 
 export const sfx = new SoundEffects();
+

@@ -775,3 +775,4 @@ export class TowerProjectile {
     this.scene.remove(this.mesh);
   }
 }
+

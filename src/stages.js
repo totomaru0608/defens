@@ -258,3 +258,4 @@ export const ENEMY_TYPES = {
     isBoss: true,
   },
 };
+
