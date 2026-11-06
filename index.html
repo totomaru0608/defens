@@ -62,12 +62,19 @@
               </div>
             </div>
 
-            <!-- 우측: 보유 코인 & 에디터/유틸 버튼 -->
+            <!-- 우측: 보유 코인 & ComfyUI 스튜디오 / 에디터 / 유틸 버튼 -->
             <div class="hud-right-row">
               <div id="coin-hud" class="hud-panel coin-panel">
                 <span class="coin-icon-3d">🪙</span>
-                <span id="coin-count">75</span>
+                <span id="coin-count">80</span>
               </div>
+              <button
+                id="btn-comfy"
+                class="hud-btn comfy-toggle-btn"
+                title="ComfyUI 스타일 동물(코끼리·하마·기린) 디자인 & 움직임 동작 노드 스튜디오"
+              >
+                🎨 ComfyUI 모션
+              </button>
               <button id="btn-editor" class="hud-btn editor-toggle-btn" title="스테이지 및 지형물 에디터 열기/닫기">
                 🛠️ 에디터
               </button>
@@ -166,21 +173,127 @@
           </div>
         </div>
 
+        <!-- ComfyUI 동물 디자인 & 모션 노드 워크플로우 스튜디오 오버레이 -->
+        <div id="comfy-overlay" class="comfy-overlay hidden">
+          <div class="comfy-window">
+            <div class="comfy-header">
+              <div class="comfy-title-group">
+                <span class="comfy-dot"></span>
+                <strong>ComfyUI 3D Animal Rig &amp; Motion Graph</strong>
+                <span class="comfy-sub">코끼리 · 하마 · 기린 다관절 모션 노드 디자인</span>
+              </div>
+              <div class="comfy-header-actions">
+                <button id="btn-comfy-export" class="comfy-action-btn secondary">📥 Workflow JSON 저장</button>
+                <button id="btn-comfy-spawn" class="comfy-action-btn primary">⚡ Queue Prompt (전장에 즉시 소환)</button>
+                <button id="btn-comfy-close" class="comfy-close-btn">✕ 닫기</button>
+              </div>
+            </div>
+
+            <div class="comfy-graph-body">
+              <!-- Node 1: Load Animal 3D Rig -->
+              <div class="comfy-node">
+                <div class="node-header node-blue">
+                  <span>1 · LoadAnimal3DRig</span>
+                  <span class="node-pin">MESH ●</span>
+                </div>
+                <div class="node-content">
+                  <div class="animal-tabs">
+                    <button class="animal-tab active" data-animal="elephant">🐘 코끼리</button>
+                    <button class="animal-tab" data-animal="hippo">🦛 하마</button>
+                    <button class="animal-tab" data-animal="giraffe">🦒 기린</button>
+                  </div>
+                  <div class="comfy-preview-box">
+                    <canvas id="comfy-preview-canvas"></canvas>
+                    <div id="comfy-preview-caption" class="preview-caption">
+                      🐘 붉은 전투코끼리 (코 휘젓기 + 귀 펄럭임 + 4족 보행)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="comfy-wire">━━▶</div>
+
+              <!-- Node 2: Kinetix Motion Rig Sampler -->
+              <div class="comfy-node">
+                <div class="node-header node-purple">
+                  <span>● RIG · 2 · KinetixMotionSampler</span>
+                  <span class="node-pin">MOTION ●</span>
+                </div>
+                <div class="node-content">
+                  <label class="node-param">
+                    <div class="param-row">
+                      <span>stride_speed (보행 속도)</span>
+                      <strong id="val-stride-speed">9.0</strong>
+                    </div>
+                    <input id="inp-stride-speed" type="range" min="4" max="20" step="0.5" value="9.0" />
+                  </label>
+
+                  <label class="node-param">
+                    <div class="param-row">
+                      <span>leg_swing (4족 관절 보폭)</span>
+                      <strong id="val-leg-swing">0.55</strong>
+                    </div>
+                    <input id="inp-leg-swing" type="range" min="0.15" max="1.1" step="0.05" value="0.55" />
+                  </label>
+
+                  <label class="node-param">
+                    <div class="param-row">
+                      <span id="lbl-special-amp">trunk_ear_motion (코/귀 동작)</span>
+                      <strong id="val-special-amp">1.0</strong>
+                    </div>
+                    <input id="inp-special-amp" type="range" min="0" max="2.0" step="0.1" value="1.0" />
+                  </label>
+
+                  <label class="node-param">
+                    <div class="param-row">
+                      <span>mesh_scale (모델 크기 배율)</span>
+                      <strong id="val-scale-mult">1.0x</strong>
+                    </div>
+                    <input id="inp-scale-mult" type="range" min="0.7" max="1.6" step="0.05" value="1.0" />
+                  </label>
+                </div>
+              </div>
+
+              <div class="comfy-wire">━━▶</div>
+
+              <!-- Node 3: Stage Wave Output & Quick Spawner -->
+              <div class="comfy-node">
+                <div class="node-header node-green">
+                  <span>● MOTION · 3 · StageWaveInjector</span>
+                </div>
+                <div class="node-content">
+                  <p class="node-desc">
+                    조절한 관절 모션은 현재 전장의 모든 <strong>코끼리·하마·기린</strong>에게 실시간 적용됩니다.
+                  </p>
+                  <div class="quick-spawn-grid">
+                    <button class="quick-spawn-btn" data-spawn="elephant">🐘 코끼리 즉시 소환</button>
+                    <button class="quick-spawn-btn" data-spawn="hippo">🦛 하마 즉시 소환</button>
+                    <button class="quick-spawn-btn" data-spawn="giraffe">🦒 기린 즉시 소환</button>
+                  </div>
+                  <div class="node-status-box">
+                    <span>워크플로우 상태:</span>
+                    <strong id="comfy-status-text">실시간 리깅 동기화 완료 ✓</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- 시작 / 스테이지 클리어 / 승리 / 패배 오버레이 -->
         <div id="modal-overlay" class="modal-overlay">
           <div class="modal-card">
             <div id="modal-badge" class="modal-badge">3D LOW-POLY TOWER DEFENSE ACTION</div>
             <h1 id="modal-title">🛡️ 코인 수비대</h1>
             <p id="modal-desc">
-              구불구불한 모래길을 따라 몰려오는 <strong>붉은 적 무리</strong>로부터 왕국의 작은 성채를 지켜내세요!<br />
-              마우스로 지면을 가리켜 수비대장을 부드럽게 이동시키고, 적을 처치해 얻은 <strong>코인(🪙)</strong>으로 길 주변 건설 구역에 방어탑을 세우세요.
+              구불구불한 모래길을 따라 몰려오는 <strong>코끼리🐘 · 하마🦛 · 기린🦒 야수 군단</strong>과 붉은 적 무리로부터 왕국의 작은 성채를 지켜내세요!
             </p>
             <div class="modal-features">
               <div class="feature-item">
-                <span class="f-icon">🖱️</span>
+                <span class="f-icon">🐘</span>
                 <div>
-                  <strong>마우스 지면 이동</strong>
-                  <small>포인터 지면 좌표를 향해 가속/감속 이동</small>
+                  <strong>다관절 야수 군단</strong>
+                  <small>코끼리·하마·기린 3D 관절 모션 &amp; ComfyUI 스튜디오</small>
                 </div>
               </div>
               <div class="feature-item">
@@ -193,8 +306,8 @@
               <div class="feature-item">
                 <span class="f-icon">🏰</span>
                 <div>
-                  <strong>스테이지 연속 정복</strong>
-                  <small>기본 3개 스테이지 + 자유로운 스테이지 추가</small>
+                  <strong>5개 스테이지 정복</strong>
+                  <small>초록 들판부터 본성 결전까지 순차 클리어</small>
                 </div>
               </div>
             </div>

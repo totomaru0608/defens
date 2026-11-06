@@ -1,12 +1,351 @@
 import * as THREE from 'three';
 import { makeLowPolyMaterial, MAP_BOUNDS } from './world.js';
-import { TOWER_TYPES, ENEMY_TYPES } from './stages.js';
+import { TOWER_TYPES, ENEMY_TYPES, ANIMAL_MOTION_CONFIG } from './stages.js';
 
 // 각도 보간 헬퍼
 function lerpAngle(a, b, t) {
   let diff = ((b - a + Math.PI) % (Math.PI * 2)) - Math.PI;
   if (diff < -Math.PI) diff += Math.PI * 2;
   return a + diff * Math.min(1, t);
+}
+
+// ============================================================================
+// ComfyUI 스타일 다관절 3D 동물 적(코끼리, 하마, 기린) 모델 & 모션 리깅 빌더
+// ============================================================================
+export function buildAnimalRig(animalType, bodyColorHex, accentColorHex) {
+  const root = new THREE.Group();
+  const cfg = ANIMAL_MOTION_CONFIG[animalType] || {};
+  const bodyMat = makeLowPolyMaterial(bodyColorHex ?? cfg.bodyColor ?? 0xdc2626);
+  const accentMat = makeLowPolyMaterial(accentColorHex ?? cfg.accentColor ?? 0xfbbf24);
+  const ivoryMat = makeLowPolyMaterial(0xfef9c3, { roughness: 0.4 });
+  const darkMat = makeLowPolyMaterial(0x1e293b);
+  const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+  const rig = {
+    root,
+    legs: [], // [FL, FR, BL, BR]
+    trunkPivot: null,
+    trunkTipPivot: null,
+    leftEarPivot: null,
+    rightEarPivot: null,
+    jawPivot: null,
+    neckPivot: null,
+    tailPivot: null,
+  };
+
+  if (animalType === 'elephant') {
+    // 🐘 1. 붉은 전투 코끼리 (War Elephant)
+    // 4개의 굵은 다리 관절
+    const legCoords = [
+      [-0.48, 0.55, 0.58], // FL
+      [0.48, 0.55, 0.58],  // FR
+      [-0.48, 0.55, -0.58], // BL
+      [0.48, 0.55, -0.58],  // BR
+    ];
+    legCoords.forEach(([lx, ly, lz]) => {
+      const legPivot = new THREE.Group();
+      legPivot.position.set(lx, ly, lz);
+      const legMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.28, 0.72, 7), bodyMat);
+      legMesh.position.y = -0.22;
+      legMesh.castShadow = true;
+      legPivot.add(legMesh);
+      root.add(legPivot);
+      rig.legs.push(legPivot);
+    });
+
+    // 묵직한 코끼리 몸통
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.32, 1.08, 1.75), bodyMat);
+    body.position.set(0, 0.98, 0);
+    body.castShadow = true;
+    root.add(body);
+
+    // 등 위 전투 안장/휘장
+    const saddle = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.35, 1.05), accentMat);
+    saddle.position.set(0, 1.48, -0.05);
+    saddle.castShadow = true;
+    root.add(saddle);
+
+    // 코끼리 머리
+    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.62, 0), bodyMat);
+    head.position.set(0, 1.28, 0.98);
+    head.castShadow = true;
+    root.add(head);
+
+    // 눈
+    const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), eyeMat);
+    eyeL.position.set(-0.36, 1.38, 1.38);
+    root.add(eyeL);
+    const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), eyeMat);
+    eyeR.position.set(0.36, 1.38, 1.38);
+    root.add(eyeR);
+
+    // 양쪽 커다란 귀 (펄럭임 관절)
+    rig.leftEarPivot = new THREE.Group();
+    rig.leftEarPivot.position.set(-0.52, 1.32, 0.88);
+    const earL = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.78, 0.12), bodyMat);
+    earL.position.set(-0.28, -0.05, 0);
+    earL.castShadow = true;
+    rig.leftEarPivot.add(earL);
+    root.add(rig.leftEarPivot);
+
+    rig.rightEarPivot = new THREE.Group();
+    rig.rightEarPivot.position.set(0.52, 1.32, 0.88);
+    const earR = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.78, 0.12), bodyMat);
+    earR.position.set(0.28, -0.05, 0);
+    earR.castShadow = true;
+    rig.rightEarPivot.add(earR);
+    root.add(rig.rightEarPivot);
+
+    // 2단 관절 코(Trunk) + 양쪽 상아(Tusks)
+    rig.trunkPivot = new THREE.Group();
+    rig.trunkPivot.position.set(0, 1.15, 1.42);
+    const trunkUpper = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.15, 0.62, 6), bodyMat);
+    trunkUpper.position.set(0, -0.25, 0.12);
+    trunkUpper.rotation.x = 0.35;
+    trunkUpper.castShadow = true;
+    rig.trunkPivot.add(trunkUpper);
+
+    rig.trunkTipPivot = new THREE.Group();
+    rig.trunkTipPivot.position.set(0, -0.5, 0.22);
+    const trunkLower = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.1, 0.55, 6), bodyMat);
+    trunkLower.position.set(0, -0.2, 0.14);
+    trunkLower.rotation.x = 0.65;
+    rig.trunkTipPivot.add(trunkLower);
+    rig.trunkPivot.add(rig.trunkTipPivot);
+    root.add(rig.trunkPivot);
+
+    // 하얀 상아 한 쌍
+    for (const side of [-1, 1]) {
+      const tusk = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.75, 6), ivoryMat);
+      tusk.position.set(side * 0.34, 0.96, 1.58);
+      tusk.rotation.x = Math.PI / 2 - 0.35;
+      tusk.rotation.z = side * -0.15;
+      tusk.castShadow = true;
+      root.add(tusk);
+    }
+
+    // 꼬리
+    rig.tailPivot = new THREE.Group();
+    rig.tailPivot.position.set(0, 1.1, -0.88);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 0.55, 5), darkMat);
+    tail.position.set(0, -0.24, -0.08);
+    tail.rotation.x = -0.35;
+    rig.tailPivot.add(tail);
+    root.add(rig.tailPivot);
+  } else if (animalType === 'hippo') {
+    // 🦛 2. 진홍 강철하마 (Armored Hippo - 입 크게 벌렸다 다무는 Chomp 관절)
+    const legCoords = [
+      [-0.46, 0.42, 0.55],
+      [0.46, 0.42, 0.55],
+      [-0.46, 0.42, -0.55],
+      [0.46, 0.42, -0.55],
+    ];
+    legCoords.forEach(([lx, ly, lz]) => {
+      const legPivot = new THREE.Group();
+      legPivot.position.set(lx, ly, lz);
+      const legMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 0.52, 6), bodyMat);
+      legMesh.position.y = -0.15;
+      legMesh.castShadow = true;
+      legPivot.add(legMesh);
+      root.add(legPivot);
+      rig.legs.push(legPivot);
+    });
+
+    // 통통하고 묵직한 하마 몸통
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.36, 0.95, 1.68), bodyMat);
+    body.position.set(0, 0.78, -0.05);
+    body.castShadow = true;
+    root.add(body);
+
+    // 등 갑옷 징 장식
+    const backPlate = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.2, 1.1), accentMat);
+    backPlate.position.set(0, 1.28, -0.05);
+    root.add(backPlate);
+
+    // 머리 & 윗주둥이
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.72, 0.78), bodyMat);
+    head.position.set(0, 0.96, 0.88);
+    head.castShadow = true;
+    root.add(head);
+
+    const upperSnout = new THREE.Mesh(new THREE.BoxGeometry(1.14, 0.46, 0.72), accentMat);
+    upperSnout.position.set(0, 0.88, 1.42);
+    upperSnout.castShadow = true;
+    root.add(upperSnout);
+
+    // 콧구멍 & 작은 귀 & 눈
+    for (const side of [-1, 1]) {
+      const nostril = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.14), darkMat);
+      nostril.position.set(side * 0.28, 1.14, 1.58);
+      root.add(nostril);
+
+      const ear = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.24, 0.14), bodyMat);
+      ear.position.set(side * 0.44, 1.38, 0.72);
+      root.add(ear);
+
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.11, 0.11), eyeMat);
+      eye.position.set(side * 0.42, 1.15, 1.08);
+      root.add(eye);
+    }
+
+    // 아래턱 관절 (와구와구 개폐 동작)
+    rig.jawPivot = new THREE.Group();
+    rig.jawPivot.position.set(0, 0.64, 1.05);
+    const lowerJaw = new THREE.Mesh(new THREE.BoxGeometry(1.06, 0.26, 0.74), bodyMat);
+    lowerJaw.position.set(0, -0.06, 0.34);
+    lowerJaw.castShadow = true;
+    rig.jawPivot.add(lowerJaw);
+
+    // 아래턱 양쪽 하얀 송곳니
+    for (const side of [-1, 1]) {
+      const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.28, 5), ivoryMat);
+      tooth.position.set(side * 0.34, 0.14, 0.56);
+      rig.jawPivot.add(tooth);
+    }
+    root.add(rig.jawPivot);
+  } else {
+    // 🦒 3. 홍련 기린 (Crimson Giraffe - 긴 다리 질주 + 긴 목 흔들기 관절)
+    const legCoords = [
+      [-0.32, 0.88, 0.45],
+      [0.32, 0.88, 0.45],
+      [-0.32, 0.88, -0.45],
+      [0.32, 0.88, -0.45],
+    ];
+    legCoords.forEach(([lx, ly, lz]) => {
+      const legPivot = new THREE.Group();
+      legPivot.position.set(lx, ly, lz);
+      const legMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.09, 0.95, 6), bodyMat);
+      legMesh.position.y = -0.42;
+      legMesh.castShadow = true;
+      legPivot.add(legMesh);
+
+      const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.12, 0.16, 6), darkMat);
+      hoof.position.y = -0.86;
+      legPivot.add(hoof);
+
+      root.add(legPivot);
+      rig.legs.push(legPivot);
+    });
+
+    // 날렵한 기린 몸통 + 반점 패치
+    const body = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.72, 1.28), bodyMat);
+    body.position.set(0, 1.12, 0);
+    body.castShadow = true;
+    root.add(body);
+
+    const spot1 = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.32, 0.36), accentMat);
+    spot1.position.set(0, 1.16, 0.18);
+    root.add(spot1);
+
+    const spot2 = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.28, 0.32), accentMat);
+    spot2.position.set(0, 1.05, -0.28);
+    root.add(spot2);
+
+    // 긴 목 관절 (Neck Pivot)
+    rig.neckPivot = new THREE.Group();
+    rig.neckPivot.position.set(0, 1.36, 0.48);
+
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.26, 1.65, 6), bodyMat);
+    neck.position.set(0, 0.75, 0.22);
+    neck.rotation.x = 0.28;
+    neck.castShadow = true;
+    rig.neckPivot.add(neck);
+
+    // 목 갈기 장식
+    const mane = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.45, 0.16), accentMat);
+    mane.position.set(0, 0.75, 0.04);
+    mane.rotation.x = 0.28;
+    rig.neckPivot.add(mane);
+
+    // 기린 머리 + 주둥이 + 뿔(오시콘)
+    const head = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.62), bodyMat);
+    head.position.set(0, 1.58, 0.56);
+    head.castShadow = true;
+    rig.neckPivot.add(head);
+
+    for (const side of [-1, 1]) {
+      const horn = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.28, 5), darkMat);
+      horn.position.set(side * 0.12, 1.85, 0.45);
+      rig.neckPivot.add(horn);
+
+      const hornTip = new THREE.Mesh(new THREE.DodecahedronGeometry(0.08, 0), accentMat);
+      hornTip.position.set(side * 0.12, 2.0, 0.45);
+      rig.neckPivot.add(hornTip);
+
+      const eye = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.08), eyeMat);
+      eye.position.set(side * 0.22, 1.62, 0.66);
+      rig.neckPivot.add(eye);
+    }
+
+    root.add(rig.neckPivot);
+
+    // 꼬리
+    rig.tailPivot = new THREE.Group();
+    rig.tailPivot.position.set(0, 1.18, -0.64);
+    const tail = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.65, 5), darkMat);
+    tail.position.set(0, -0.28, -0.08);
+    tail.rotation.x = -0.25;
+    rig.tailPivot.add(tail);
+    root.add(rig.tailPivot);
+  }
+
+  return rig;
+}
+
+// 다관절 동물 리깅 실시간 모션 애니메이션 업데이트 (필드 & ComfyUI 스튜디오 공용)
+export function animateAnimalRig(rig, animalType, elapsedTime, walkSeed = 0) {
+  const cfg = ANIMAL_MOTION_CONFIG[animalType] || {
+    strideSpeed: 10,
+    legSwing: 0.55,
+    specialAmp: 1.0,
+  };
+  const phase = elapsedTime * cfg.strideSpeed + walkSeed;
+  const swing = cfg.legSwing;
+  const amp = cfg.specialAmp;
+
+  // 4족 보행 대각선 교차 다리 스윙 (FL & BR 동상, FR & BL 역상)
+  if (rig.legs.length === 4) {
+    rig.legs[0].rotation.x = Math.sin(phase) * swing;
+    rig.legs[1].rotation.x = -Math.sin(phase) * swing;
+    rig.legs[2].rotation.x = -Math.sin(phase) * swing;
+    rig.legs[3].rotation.x = Math.sin(phase) * swing;
+  }
+
+  // 몸통 상하 바운스 및 좌우 롤링
+  rig.root.position.y = Math.abs(Math.sin(phase)) * 0.15;
+  rig.root.rotation.z = Math.cos(phase) * 0.06;
+
+  if (animalType === 'elephant') {
+    // 코끼리: 코(Trunk) 상하/좌우 휘젓기 + 큰 귀 펄럭임
+    if (rig.trunkPivot) {
+      rig.trunkPivot.rotation.x = Math.sin(phase * 0.85) * 0.42 * amp;
+      rig.trunkPivot.rotation.z = Math.cos(phase * 0.6) * 0.28 * amp;
+    }
+    if (rig.trunkTipPivot) {
+      rig.trunkTipPivot.rotation.x = (0.3 + Math.sin(phase * 1.1) * 0.45) * amp;
+    }
+    if (rig.leftEarPivot && rig.rightEarPivot) {
+      const flap = (Math.sin(phase * 1.3) * 0.25 + 0.2) * amp;
+      rig.leftEarPivot.rotation.y = -flap;
+      rig.rightEarPivot.rotation.y = flap;
+    }
+  } else if (animalType === 'hippo') {
+    // 하마: 거대한 아래턱을 와구와구 벌렸다 다물기 (Chomp)
+    if (rig.jawPivot) {
+      const chomp = Math.max(0, Math.sin(phase * 0.95)) * 0.68 * amp;
+      rig.jawPivot.rotation.x = chomp;
+    }
+  } else if (animalType === 'giraffe') {
+    // 기린: 긴 목이 걸음 리듬에 맞춰 앞뒤 끄덕임 + 좌우 흔들림
+    if (rig.neckPivot) {
+      rig.neckPivot.rotation.x = Math.sin(phase) * 0.22 * amp;
+      rig.neckPivot.rotation.z = Math.cos(phase * 0.5) * 0.14 * amp;
+    }
+  }
+
+  if (rig.tailPivot) {
+    rig.tailPivot.rotation.z = Math.sin(phase * 1.5) * 0.35;
+  }
 }
 
 // 1. 독창적인 주인공 캐릭터: "코인 수비대장" 3D 모델 및 물리 이동
@@ -18,7 +357,7 @@ export class PlayerHero {
     this.velocity = new THREE.Vector3(0, 0, 0);
     this.targetPos = new THREE.Vector3(startX, 0, startZ);
 
-    // 이동 속도 및 가속도 파라미터 (순간이동 방지, 부드러운 가속/감속)
+    // 이동 속도 및 가속도 파라미터
     this.maxSpeed = 11.8;
     this.acceleration = 52.0;
     this.damping = 10.5;
@@ -44,7 +383,6 @@ export class PlayerHero {
     this.group.position.copy(this.position);
     scene.add(this.group);
 
-    // 마우스 이동 목표 지점 3D 마커
     this.targetMarker = this.createTargetMarker();
     scene.add(this.targetMarker);
   }
@@ -60,7 +398,6 @@ export class PlayerHero {
     const steelMat = makeLowPolyMaterial(0xe2e8f0, { metalness: 0.5, roughness: 0.3 });
     const darkMat = makeLowPolyMaterial(0x1e293b);
 
-    // 플레이어 발밑 사거리 표시 링
     const rangeGeo = new THREE.RingGeometry(this.attackRange - 0.12, this.attackRange, 36);
     rangeGeo.rotateX(-Math.PI / 2);
     const rangeMat = new THREE.MeshBasicMaterial({
@@ -73,7 +410,6 @@ export class PlayerHero {
     this.rangeRing.position.y = 0.08;
     this.group.add(this.rangeRing);
 
-    // 다리 (왼발/오른발)
     this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.55, 0.36), darkMat);
     this.leftLeg.position.set(-0.22, 0.28, 0);
     this.leftLeg.castShadow = true;
@@ -84,25 +420,21 @@ export class PlayerHero {
     this.rightLeg.castShadow = true;
     this.bodyPivot.add(this.rightLeg);
 
-    // 몸통 갑옷
     const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.58, 0.95, 7), armorMat);
     torso.position.y = 0.95;
     torso.castShadow = true;
     this.bodyPivot.add(torso);
 
-    // 황금 가슴 벨트
     const belt = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.56, 0.2, 7), goldMat);
     belt.position.y = 0.65;
     this.bodyPivot.add(belt);
 
-    // 등 뒤 붉은 망토
     this.cape = new THREE.Mesh(new THREE.BoxGeometry(0.82, 0.95, 0.12), capeMat);
     this.cape.position.set(0, 0.92, -0.45);
     this.cape.rotation.x = 0.22;
     this.cape.castShadow = true;
     this.bodyPivot.add(this.cape);
 
-    // 머리 & 로우폴리 투구
     const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.46, 0), skinMat);
     head.position.y = 1.72;
     head.castShadow = true;
@@ -113,14 +445,12 @@ export class PlayerHero {
     helmet.castShadow = true;
     this.bodyPivot.add(helmet);
 
-    // 투구 위 황금 깃털 장식
     const plume = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.65, 5), goldMat);
     plume.position.set(0, 2.38, -0.08);
     plume.rotation.x = -0.35;
     plume.castShadow = true;
     this.bodyPivot.add(plume);
 
-    // 왼팔 + 코인 문양 황금 방패
     this.shieldArm = new THREE.Group();
     this.shieldArm.position.set(-0.62, 1.05, 0.18);
     const shieldDisc = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.14, 8), goldMat);
@@ -130,7 +460,6 @@ export class PlayerHero {
     this.shieldArm.add(shieldDisc);
     this.bodyPivot.add(this.shieldArm);
 
-    // 오른팔 + 황금빛 기사 대검
     this.weaponArm = new THREE.Group();
     this.weaponArm.position.set(0.62, 1.08, 0.15);
 
@@ -175,7 +504,6 @@ export class PlayerHero {
   }
 
   setMoveTarget(worldPoint) {
-    // 맵 경계 내부로 목표 지점 클램프
     this.targetPos.x = THREE.MathUtils.clamp(worldPoint.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
     this.targetPos.z = THREE.MathUtils.clamp(worldPoint.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
     this.targetPos.y = 0;
@@ -184,14 +512,12 @@ export class PlayerHero {
   }
 
   update(dt, elapsedTime) {
-    // 1. 목표 지점까지의 거리 계산 및 가속도/감속 기반 부드러운 이동
     const toTarget = new THREE.Vector3().subVectors(this.targetPos, this.position);
     toTarget.y = 0;
     const dist = toTarget.length();
 
     if (dist > this.stopRadius) {
       const dir = toTarget.clone().normalize();
-      // 목표 지점 근처에서 자연스럽게 감속
       const speedFactor = dist < this.slowRadius ? dist / this.slowRadius : 1.0;
       const desiredSpeed = this.maxSpeed * Math.max(0.18, speedFactor);
       const desiredVel = dir.multiplyScalar(desiredSpeed);
@@ -203,28 +529,23 @@ export class PlayerHero {
       }
       this.velocity.add(steer);
     } else {
-      // 도착 시 부드럽게 정지
       this.velocity.multiplyScalar(Math.max(0, 1 - this.damping * dt));
     }
 
-    // 최대 속도 제한
     if (this.velocity.length() > this.maxSpeed) {
       this.velocity.normalize().multiplyScalar(this.maxSpeed);
     }
 
-    // 위치 업데이트 및 맵 경계 제한(Clamp)
     this.position.addScaledVector(this.velocity, dt);
     this.position.x = THREE.MathUtils.clamp(this.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
     this.position.z = THREE.MathUtils.clamp(this.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
     this.group.position.copy(this.position);
 
-    // 이동 방향으로 부드러운 회전
     const speed = this.velocity.length();
     if (speed > 0.25) {
       const targetAngle = Math.atan2(this.velocity.x, this.velocity.z);
       this.bodyPivot.rotation.y = lerpAngle(this.bodyPivot.rotation.y, targetAngle, 14 * dt);
 
-      // 걷기 바운스 & 다리 스윙 애니메이션
       const walkCycle = elapsedTime * 13;
       this.bodyPivot.position.y = Math.abs(Math.sin(walkCycle)) * 0.16;
       this.leftLeg.rotation.x = Math.sin(walkCycle) * 0.55;
@@ -236,7 +557,6 @@ export class PlayerHero {
       this.rightLeg.rotation.x *= 0.8;
     }
 
-    // 무기 휘두르기 애니메이션
     if (this.swingAnimTime > 0) {
       this.swingAnimTime = Math.max(0, this.swingAnimTime - dt * 5.5);
       const s = Math.sin((1 - this.swingAnimTime) * Math.PI);
@@ -247,11 +567,9 @@ export class PlayerHero {
       this.weaponArm.rotation.x = 0;
     }
 
-    // 타겟 마커 펄스
     const markerScale = 0.9 + Math.sin(elapsedTime * 6) * 0.12;
     this.targetMarker.scale.set(markerScale, 1, markerScale);
 
-    // 쿨타임 감소 및 미세 체력 회복
     if (this.attackTimer > 0) this.attackTimer = Math.max(0, this.attackTimer - dt);
     if (this.skillTimer > 0) this.skillTimer = Math.max(0, this.skillTimer - dt);
     if (this.hp < this.maxHp && this.hp > 0) {
@@ -282,7 +600,6 @@ export class BuildPad {
     this.position = new THREE.Vector3(padData.x, 0, padData.z);
     this.baseCost = padData.baseCost || 30;
 
-    // 상태: null(미설치) 또는 설치된 타워 정보
     this.towerType = null;
     this.level = 0;
     this.maxLevel = 3;
@@ -307,14 +624,12 @@ export class BuildPad {
     const stoneMat = makeLowPolyMaterial(0xcbd5e1);
     const rimMat = makeLowPolyMaterial(0xfbbf24, { metalness: 0.3, roughness: 0.45 });
 
-    // 팔각형 석재 패드 베이스
     const base = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.95, 0.24, 8), stoneMat);
     base.position.y = 0.12;
     base.receiveShadow = true;
     base.castShadow = true;
     this.group.add(base);
 
-    // 황금 테두리 링
     const ringGeo = new THREE.RingGeometry(1.78, 2.02, 24);
     ringGeo.rotateX(-Math.PI / 2);
     this.ringMat = new THREE.MeshBasicMaterial({
@@ -327,7 +642,6 @@ export class BuildPad {
     this.ringMesh.position.y = 0.08;
     this.group.add(this.ringMesh);
 
-    // 건설 구역 위 회전하는 입체 황금 코인 홀로그램
     this.floatingCoin = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.16, 12), rimMat);
     this.floatingCoin.rotation.z = Math.PI / 2;
     this.floatingCoin.position.y = 1.45;
@@ -335,7 +649,6 @@ export class BuildPad {
     this.group.add(this.floatingCoin);
   }
 
-  // 현재 건설/강화에 필요한 총 코인 계산
   getCurrentTargetCost(selectedTypeKey) {
     if (this.level === 0) {
       const t = TOWER_TYPES[selectedTypeKey] || TOWER_TYPES.crossbow;
@@ -376,7 +689,6 @@ export class BuildPad {
 
     const heightScale = 1 + (this.level - 1) * 0.22;
 
-    // 탑 기단부
     const pillar = new THREE.Mesh(
       new THREE.CylinderGeometry(1.05, 1.35, 1.7 * heightScale, 7),
       stoneMat
@@ -386,7 +698,6 @@ export class BuildPad {
     pillar.receiveShadow = true;
     this.towerGroup.add(pillar);
 
-    // 레벨 표시 황금 링
     for (let lv = 0; lv < this.level; lv++) {
       const band = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.22, 0.14, 7), goldMat);
       band.position.y = 0.65 + lv * 0.42;
@@ -399,7 +710,6 @@ export class BuildPad {
     this.towerGroup.add(this.turretHead);
 
     if (this.towerType === 'crossbow') {
-      // 연사 석궁탑
       const mount = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.55, 0.95), woodMat);
       mount.castShadow = true;
       this.turretHead.add(mount);
@@ -413,7 +723,6 @@ export class BuildPad {
       barrel.position.set(0, 0.22, 0.35);
       this.turretHead.add(barrel);
     } else if (this.towerType === 'cannon') {
-      // 화염 대포탑
       const basecarriage = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.5, 1.05), woodMat);
       this.turretHead.add(basecarriage);
 
@@ -431,7 +740,6 @@ export class BuildPad {
       muzzleRing.position.set(0, 0.4, 1.0);
       this.turretHead.add(muzzleRing);
     } else {
-      // 빙결 수정탑
       const crystalMat = makeLowPolyMaterial(0x38bdf8, {
         emissive: 0x0284c7,
         emissiveIntensity: 0.45,
@@ -489,7 +797,7 @@ export class BuildPad {
   }
 }
 
-// 3. 길을 따라 이동하는 붉은 적 무리 (Red Enemy Horde)
+// 3. 길을 따라 이동하는 붉은 적 & 동물 야수 무리 (코끼리, 하마, 기린, 보병, 보스)
 export class RedEnemy {
   constructor(scene, typeKey, roadCurve, stageMultiplier = 1) {
     this.scene = scene;
@@ -506,10 +814,8 @@ export class RedEnemy {
     this.castleDamage = def.castleDamage;
     this.playerDamage = def.playerDamage;
 
-    // 경로 진행도 (0.0 -> 1.0)
     this.progress = 0;
-    // 무리가 자연스럽게 보이도록 좌우 차선 오프셋 부여
-    this.laneOffset = (Math.random() - 0.5) * 2.2;
+    this.laneOffset = (Math.random() - 0.5) * 2.1;
     this.walkSeed = Math.random() * 10;
 
     this.slowTimer = 0;
@@ -518,6 +824,7 @@ export class RedEnemy {
     this.dead = false;
     this.reachedCastle = false;
 
+    this.animalRig = null;
     this.position = new THREE.Vector3();
     this.group = new THREE.Group();
     this.buildModel();
@@ -526,76 +833,85 @@ export class RedEnemy {
   }
 
   buildModel() {
-    const s = this.def.scale;
+    const animalCfg = this.def.isAnimal ? ANIMAL_MOTION_CONFIG[this.def.animalType] : null;
+    const s = this.def.scale * (animalCfg ? animalCfg.scaleMult : 1.0);
+
     this.bodyGroup = new THREE.Group();
     this.bodyGroup.scale.set(s, s, s);
     this.group.add(this.bodyGroup);
 
-    const bodyMat = makeLowPolyMaterial(this.def.bodyColor);
-    const accentMat = makeLowPolyMaterial(this.def.accentColor);
-    const hornMat = makeLowPolyMaterial(0xfef08a);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+    if (this.def.isAnimal) {
+      // 코끼리 / 하마 / 기린 다관절 리깅 모델 생성
+      this.animalRig = buildAnimalRig(
+        this.def.animalType,
+        animalCfg?.bodyColor ?? this.def.bodyColor,
+        animalCfg?.accentColor ?? this.def.accentColor
+      );
+      this.bodyGroup.add(this.animalRig.root);
+    } else {
+      // 일반 붉은 군단 보병 / 보스 모델
+      const bodyMat = makeLowPolyMaterial(this.def.bodyColor);
+      const accentMat = makeLowPolyMaterial(this.def.accentColor);
+      const hornMat = makeLowPolyMaterial(0xfef08a);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
 
-    // 몸통
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.56, 0.95, 6), bodyMat);
-    torso.position.y = 0.65;
-    torso.castShadow = true;
-    this.bodyGroup.add(torso);
+      const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.56, 0.95, 6), bodyMat);
+      torso.position.y = 0.65;
+      torso.castShadow = true;
+      this.bodyGroup.add(torso);
 
-    // 머리
-    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), bodyMat);
-    head.position.y = 1.38;
-    head.castShadow = true;
-    this.bodyGroup.add(head);
+      const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.42, 0), bodyMat);
+      head.position.y = 1.38;
+      head.castShadow = true;
+      this.bodyGroup.add(head);
 
-    // 노란 눈
-    const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.08), eyeMat);
-    leftEye.position.set(-0.14, 1.42, 0.36);
-    this.bodyGroup.add(leftEye);
+      const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.08), eyeMat);
+      leftEye.position.set(-0.14, 1.42, 0.36);
+      this.bodyGroup.add(leftEye);
 
-    const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.08), eyeMat);
-    rightEye.position.set(0.14, 1.42, 0.36);
-    this.bodyGroup.add(rightEye);
+      const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.11, 0.08, 0.08), eyeMat);
+      rightEye.position.set(0.14, 1.42, 0.36);
+      this.bodyGroup.add(rightEye);
 
-    // 뿔 장식
-    const leftHorn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 5), hornMat);
-    leftHorn.position.set(-0.28, 1.72, 0);
-    leftHorn.rotation.z = 0.35;
-    this.bodyGroup.add(leftHorn);
+      const leftHorn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 5), hornMat);
+      leftHorn.position.set(-0.28, 1.72, 0);
+      leftHorn.rotation.z = 0.35;
+      this.bodyGroup.add(leftHorn);
 
-    const rightHorn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 5), hornMat);
-    rightHorn.position.set(0.28, 1.72, 0);
-    rightHorn.rotation.z = -0.35;
-    this.bodyGroup.add(rightHorn);
+      const rightHorn = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.42, 5), hornMat);
+      rightHorn.position.set(0.28, 1.72, 0);
+      rightHorn.rotation.z = -0.35;
+      this.bodyGroup.add(rightHorn);
 
-    // 어깨 갑옷 & 무기
-    const shoulderL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.38), accentMat);
-    shoulderL.position.set(-0.55, 0.98, 0);
-    this.bodyGroup.add(shoulderL);
+      const shoulderL = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.38), accentMat);
+      shoulderL.position.set(-0.55, 0.98, 0);
+      this.bodyGroup.add(shoulderL);
 
-    const shoulderR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.38), accentMat);
-    shoulderR.position.set(0.55, 0.98, 0);
-    this.bodyGroup.add(shoulderR);
+      const shoulderR = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.28, 0.38), accentMat);
+      shoulderR.position.set(0.55, 0.98, 0);
+      this.bodyGroup.add(shoulderR);
 
-    const club = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.95, 5), accentMat);
-    club.rotation.x = Math.PI / 2;
-    club.position.set(0.55, 0.78, 0.48);
-    club.castShadow = true;
-    this.bodyGroup.add(club);
+      const club = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.95, 5), accentMat);
+      club.rotation.x = Math.PI / 2;
+      club.position.set(0.55, 0.78, 0.48);
+      club.castShadow = true;
+      this.bodyGroup.add(club);
+    }
 
-    // 머리 위 3D 체력바
-    const barY = 2.15 * s;
+    // 머리 위 3D 체력바 (기린은 목이 길어 더 높게 배치)
+    const barHeightOffset = this.def.animalType === 'giraffe' ? 3.55 : 2.15;
+    const barY = barHeightOffset * s;
     const bgPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.25, 0.16),
+      new THREE.PlaneGeometry(1.3, 0.16),
       new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.DoubleSide })
     );
     bgPlane.position.y = barY;
     this.group.add(bgPlane);
 
     this.hpBarFill = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.18, 0.11),
+      new THREE.PlaneGeometry(1.22, 0.11),
       new THREE.MeshBasicMaterial({
-        color: this.def.isBoss ? 0xfacc15 : 0xef4444,
+        color: this.def.isBoss ? 0xfacc15 : this.def.isAnimal ? 0xf97316 : 0xef4444,
         side: THREE.DoubleSide,
       })
     );
@@ -614,7 +930,7 @@ export class RedEnemy {
     this.hp -= amount;
     const ratio = Math.max(0, this.hp / this.maxHp);
     this.hpBarFill.scale.x = Math.max(0.001, ratio);
-    this.hpBarFill.position.x = -(1 - ratio) * 0.59;
+    this.hpBarFill.position.x = -(1 - ratio) * 0.61;
 
     if (this.hp <= 0) {
       this.dead = true;
@@ -646,12 +962,17 @@ export class RedEnemy {
     this.position.y = 0;
     this.group.position.copy(this.position);
 
-    // 진행 방향 바라보기 + 걸음걸이 바운스
     const angle = Math.atan2(tangent.x, tangent.z);
     this.bodyGroup.rotation.y = angle;
-    const bob = Math.abs(Math.sin(elapsedTime * 11 + this.walkSeed)) * 0.18;
-    this.bodyGroup.position.y = bob;
-    this.bodyGroup.rotation.z = Math.sin(elapsedTime * 11 + this.walkSeed) * 0.09;
+
+    if (this.def.isAnimal && this.animalRig) {
+      // 코끼리, 하마, 기린 전용 다관절 모션 애니메이션
+      animateAnimalRig(this.animalRig, this.def.animalType, elapsedTime, this.walkSeed);
+    } else {
+      const bob = Math.abs(Math.sin(elapsedTime * 11 + this.walkSeed)) * 0.18;
+      this.bodyGroup.position.y = bob;
+      this.bodyGroup.rotation.z = Math.sin(elapsedTime * 11 + this.walkSeed) * 0.09;
+    }
   }
 
   update(dt, elapsedTime, cameraPosition) {
@@ -660,7 +981,6 @@ export class RedEnemy {
 
     this.updatePositionOnRoad(dt, elapsedTime);
 
-    // 체력바가 카메라를 향하도록 빌보드 회전
     if (cameraPosition) {
       this.hpBarBg.lookAt(cameraPosition);
       this.hpBarFill.lookAt(cameraPosition);
@@ -672,7 +992,7 @@ export class RedEnemy {
   }
 }
 
-// 4. 적 처치 시 드롭되는 3D 코인 (튀어오른 뒤 플레이어에게 자석처럼 흡수)
+// 4. 적 처치 시 드롭되는 3D 코인
 export class DroppedCoin {
   constructor(scene, originPos, value = 10) {
     this.scene = scene;
@@ -682,7 +1002,11 @@ export class DroppedCoin {
 
     const angle = Math.random() * Math.PI * 2;
     const speed = 2.2 + Math.random() * 2.5;
-    this.velocity = new THREE.Vector3(Math.cos(angle) * speed, 5.5 + Math.random() * 2, Math.sin(angle) * speed);
+    this.velocity = new THREE.Vector3(
+      Math.cos(angle) * speed,
+      5.5 + Math.random() * 2,
+      Math.sin(angle) * speed
+    );
     this.age = 0;
     this.collected = false;
 
@@ -707,7 +1031,6 @@ export class DroppedCoin {
     toPlayer.y += 0.9;
     const dist = toPlayer.length();
 
-    // 일정 거리 안이거나 드롭 후 0.55초가 지나면 플레이어에게 자석처럼 빨려 들어감
     if (this.age > 0.35 && (dist < 7.5 || this.age > 1.1)) {
       const pullSpeed = 16 + this.age * 10;
       this.position.addScaledVector(toPlayer.normalize(), pullSpeed * dt);
@@ -715,7 +1038,6 @@ export class DroppedCoin {
         this.collected = true;
       }
     } else {
-      // 중력 및 바닥 바운스
       this.velocity.y -= 16.5 * dt;
       this.position.addScaledVector(this.velocity, dt);
       if (this.position.y < 0.38) {
@@ -734,7 +1056,7 @@ export class DroppedCoin {
   }
 }
 
-// 5. 방어탑 발사체 (석궁 화살, 화염 포탄, 빙결 광선 구체)
+// 5. 방어탑 발사체
 export class TowerProjectile {
   constructor(scene, startPos, targetEnemy, stats) {
     this.scene = scene;
@@ -775,4 +1097,3 @@ export class TowerProjectile {
     this.scene.remove(this.mesh);
   }
 }
-

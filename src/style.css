@@ -28,7 +28,6 @@ body {
   color: var(--text-light);
 }
 
-/* PC 모니터 16:9 가로형 화면을 기본으로 유지하면서 브라우저 크기 변화에 반응 */
 #app-shell {
   width: 100vw;
   height: 100vh;
@@ -144,7 +143,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.8cqw;
+  gap: 0.7cqw;
 }
 
 .hud-panel {
@@ -157,7 +156,6 @@ body {
   pointer-events: auto;
 }
 
-/* 좌측 스테이지 & 웨이브 패널 (슬림형) */
 .stage-panel {
   display: flex;
   flex-direction: column;
@@ -217,16 +215,15 @@ body {
   transition: width 0.25s ease;
 }
 
-/* 중앙 성채 & 수비대장 체력 바 (1줄 가로 병렬 배치) */
 .vitals-panel {
   display: flex;
   align-items: center;
-  gap: 1cqw;
+  gap: 0.95cqw;
 }
 
 .vital-item {
-  width: 11.5cqw;
-  min-width: 90px;
+  width: 11cqw;
+  min-width: 86px;
   display: flex;
   flex-direction: column;
   gap: 0.3cqh;
@@ -269,29 +266,28 @@ body {
   background: linear-gradient(90deg, #4ade80, #16a34a);
 }
 
-/* 우측 코인 & 유틸 버튼 (한 줄 가로 정렬) */
 .hud-right-row {
   display: flex;
   align-items: center;
-  gap: 0.45cqw;
+  gap: 0.4cqw;
   pointer-events: auto;
 }
 
 .coin-panel {
   display: flex;
   align-items: center;
-  gap: 0.5cqw;
+  gap: 0.45cqw;
   background: linear-gradient(135deg, rgba(66, 32, 6, 0.88), rgba(28, 25, 23, 0.88));
   border-color: #fbbf24;
-  padding: 0.6cqh 1cqw;
+  padding: 0.6cqh 0.9cqw;
 }
 
 .coin-icon-3d {
-  font-size: clamp(13px, 1.35cqw, 20px);
+  font-size: clamp(13px, 1.3cqw, 19px);
 }
 
 #coin-count {
-  font-size: clamp(13px, 1.35cqw, 20px);
+  font-size: clamp(13px, 1.3cqw, 19px);
   font-weight: 900;
   color: #fef08a;
 }
@@ -301,8 +297,8 @@ body {
   color: #f1f5f9;
   border: 1.5px solid var(--panel-border);
   border-radius: 10px;
-  padding: 0.65cqh 0.75cqw;
-  font-size: clamp(10px, 0.95cqw, 14px);
+  padding: 0.65cqh 0.7cqw;
+  font-size: clamp(9.5px, 0.9cqw, 13.5px);
   font-weight: 800;
   cursor: pointer;
   white-space: nowrap;
@@ -312,6 +308,18 @@ body {
 .hud-btn:hover {
   background: rgba(51, 65, 85, 0.95);
   transform: translateY(-1px);
+}
+
+.comfy-toggle-btn {
+  border-color: #c084fc;
+  color: #f3e8ff;
+  background: rgba(59, 7, 100, 0.78);
+}
+
+.comfy-toggle-btn.active {
+  background: linear-gradient(135deg, #9333ea, #6b21a8);
+  border-color: #fde047;
+  color: #ffffff;
 }
 
 .editor-toggle-btn {
@@ -325,7 +333,7 @@ body {
   color: #ffffff;
 }
 
-/* 에디터 상단 서브 바 (슬림 1줄) */
+/* 에디터 상단 서브 바 */
 .editor-topbar {
   align-self: center;
   margin-top: 0.6cqh;
@@ -551,6 +559,283 @@ body {
   color: #fde68a;
   font-weight: 700;
   margin-left: 2px;
+}
+
+/* ==========================================================
+   ComfyUI 3D 동물 리깅 & 모션 노드 그래프 스튜디오 스타일
+   ========================================================== */
+.comfy-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(9, 12, 20, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 25;
+  padding: 2cqh 2cqw;
+}
+
+.comfy-overlay.hidden {
+  display: none;
+}
+
+.comfy-window {
+  width: min(94cqw, 1020px);
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+    #141720;
+  background-size: 18px 18px;
+  border: 2px solid #4b5563;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.85);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.comfy-header {
+  background: #1f2430;
+  border-bottom: 1px solid #374151;
+  padding: 1cqh 1.4cqw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1cqw;
+}
+
+.comfy-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.6cqw;
+  font-size: clamp(11px, 1.05cqw, 15px);
+}
+
+.comfy-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 8px #22c55e;
+}
+
+.comfy-sub {
+  font-size: clamp(9.5px, 0.82cqw, 12px);
+  color: #9ca3af;
+}
+
+.comfy-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5cqw;
+}
+
+.comfy-action-btn,
+.comfy-close-btn {
+  border-radius: 8px;
+  padding: 0.55cqh 0.9cqw;
+  font-size: clamp(9.5px, 0.85cqw, 12.5px);
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.comfy-action-btn.primary {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  color: #ffffff;
+  border-color: #60a5fa;
+}
+
+.comfy-action-btn.secondary {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.comfy-close-btn {
+  background: #991b1b;
+  color: #ffffff;
+}
+
+.comfy-graph-body {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: 1.8cqh 1.4cqw;
+  gap: 0.6cqw;
+}
+
+.comfy-node {
+  flex: 1;
+  background: #232733;
+  border: 1.5px solid #4b5563;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.node-header {
+  padding: 0.55cqh 0.9cqw;
+  font-size: clamp(9.5px, 0.85cqw, 12.5px);
+  font-weight: 800;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.node-blue {
+  background: #1e3a8a;
+  color: #bfdbfe;
+}
+
+.node-purple {
+  background: #4c1d95;
+  color: #ddd6fe;
+}
+
+.node-green {
+  background: #14532d;
+  color: #bbf7d0;
+}
+
+.node-pin {
+  font-size: 0.85em;
+  color: #fde047;
+}
+
+.node-content {
+  padding: 1cqh 0.9cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9cqh;
+  flex: 1;
+}
+
+.comfy-wire {
+  align-self: center;
+  color: #facc15;
+  font-weight: 900;
+  font-size: clamp(10px, 1cqw, 15px);
+  letter-spacing: -2px;
+}
+
+.animal-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.animal-tab {
+  background: #141720;
+  color: #cbd5e1;
+  border: 1px solid #374151;
+  border-radius: 7px;
+  padding: 0.45cqh 0.3cqw;
+  font-size: clamp(9.5px, 0.82cqw, 12px);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.animal-tab.active {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #93c5fd;
+}
+
+.comfy-preview-box {
+  position: relative;
+  width: 100%;
+  height: 21cqh;
+  min-height: 115px;
+  background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+  border: 1px solid #374151;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+#comfy-preview-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.preview-caption {
+  position: absolute;
+  bottom: 4px;
+  left: 6px;
+  right: 6px;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.82);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  color: #fde047;
+  font-weight: 700;
+}
+
+.node-param {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: clamp(9px, 0.8cqw, 11.5px);
+  color: #d1d5db;
+}
+
+.param-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.param-row strong {
+  color: #fde047;
+}
+
+.node-param input[type='range'] {
+  width: 100%;
+  accent-color: #a855f7;
+  cursor: pointer;
+}
+
+.node-desc {
+  font-size: clamp(9px, 0.8cqw, 11.5px);
+  color: #cbd5e1;
+  line-height: 1.4;
+}
+
+.quick-spawn-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5cqh;
+}
+
+.quick-spawn-btn {
+  background: #1f2937;
+  color: #fef08a;
+  border: 1px solid #4b5563;
+  border-radius: 8px;
+  padding: 0.6cqh 0.8cqw;
+  font-size: clamp(9.5px, 0.85cqw, 12px);
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.quick-spawn-btn:hover {
+  background: #374151;
+  border-color: #fde047;
+}
+
+.node-status-box {
+  margin-top: auto;
+  background: rgba(20, 83, 45, 0.45);
+  border: 1px solid #22c55e;
+  border-radius: 8px;
+  padding: 0.5cqh 0.7cqw;
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  color: #bbf7d0;
 }
 
 /* 모달 오버레이 */
