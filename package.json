@@ -1,0 +1,30 @@
+{
+  "name": "coin-defense-squad",
+  "version": "1.0.0",
+  "description": "코인 수비대 - 3D 로우폴리 아이소메트릭 타워 디펜스 액션 웹 게임",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "start": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview --host"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/totomaru0608/defens.git"
+  },
+  "keywords": [
+    "threejs",
+    "tower-defense",
+    "low-poly",
+    "isometric",
+    "action-game"
+  ],
+  "license": "ISC",
+  "dependencies": {
+    "three": "^0.183.2"
+  },
+  "devDependencies": {
+    "vite": "^8.0.0"
+  }
+}

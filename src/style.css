@@ -1,0 +1,597 @@
+:root {
+  --bg-dark: #0f172a;
+  --panel-bg: rgba(20, 32, 48, 0.84);
+  --panel-border: rgba(255, 255, 255, 0.22);
+  --gold: #fbbf24;
+  --gold-bright: #fde047;
+  --crimson: #ef4444;
+  --emerald: #22c55e;
+  --sky: #38bdf8;
+  --text-light: #f8fafc;
+  --font-main: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+  font-family: var(--font-main);
+  color: var(--text-light);
+}
+
+/* PC 모니터 16:9 가로형 화면을 기본으로 유지하면서 브라우저 크기 변화에 반응 */
+#app-shell {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+}
+
+#game-viewport {
+  position: relative;
+  width: min(100vw - 16px, calc((100vh - 16px) * (16 / 9)));
+  height: min(100vh - 16px, calc((100vw - 16px) * (9 / 16)));
+  aspect-ratio: 16 / 9;
+  background: #65b741;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.65), 0 0 0 3px rgba(255, 255, 255, 0.14);
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: crosshair;
+}
+
+/* 3D 월드 위 건설 구역 코인 배지 & 플로팅 텍스트 */
+#world-labels {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 5;
+}
+
+.pad-label {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: rgba(17, 24, 39, 0.88);
+  border: 2px solid #fbbf24;
+  border-radius: 999px;
+  padding: 4px 12px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: clamp(11px, 1.05vw, 15px);
+  color: #fef08a;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45);
+  white-space: nowrap;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.pad-label.can-afford {
+  border-color: #4ade80;
+  background: rgba(20, 83, 45, 0.92);
+  color: #ffffff;
+}
+
+.pad-label.active-pad {
+  transform: translate(-50%, -112%) scale(1.12);
+  box-shadow: 0 0 18px rgba(250, 204, 21, 0.85);
+}
+
+.pad-label.maxed {
+  border-color: #38bdf8;
+  background: rgba(12, 74, 110, 0.88);
+  color: #bae6fd;
+}
+
+.pad-coin-icon {
+  font-size: 1.15em;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.4));
+}
+
+.floating-text {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-weight: 900;
+  font-size: clamp(13px, 1.2vw, 18px);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+  animation: floatUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(0.85);
+  }
+  30% {
+    opacity: 1;
+    transform: translate(-50%, -16px) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -42px) scale(0.95);
+  }
+}
+
+/* HUD 레이아웃 */
+#hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(10px, 1.4vw, 20px);
+  z-index: 10;
+}
+
+.hud-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hud-panel {
+  background: var(--panel-bg);
+  backdrop-filter: blur(8px);
+  border: 2px solid var(--panel-border);
+  border-radius: 16px;
+  padding: clamp(8px, 0.9vw, 14px) clamp(12px, 1.2vw, 18px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+/* 좌측 스테이지 패널 */
+.stage-panel {
+  min-width: clamp(210px, 21vw, 290px);
+}
+
+.game-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.brand-badge {
+  font-weight: 900;
+  font-size: clamp(14px, 1.25vw, 18px);
+  color: var(--gold-bright);
+  letter-spacing: -0.02em;
+}
+
+.stage-tag {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-weight: 800;
+  font-size: clamp(10px, 0.85vw, 12px);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.stage-name {
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.wave-label-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(11px, 0.85vw, 13px);
+  color: #cbd5e1;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.progress-track {
+  width: 100%;
+  height: 9px;
+  background: rgba(15, 23, 42, 0.85);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #f97316, #ef4444);
+  border-radius: 999px;
+  transition: width 0.25s ease;
+}
+
+/* 중앙 성채 & 플레이어 체력 바 */
+.vitals-panel {
+  flex: 1;
+  max-width: clamp(260px, 30vw, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vital-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.vital-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: clamp(11px, 0.9vw, 13px);
+  font-weight: 800;
+}
+
+.hp-bar-outer {
+  width: 100%;
+  height: 12px;
+  background: rgba(15, 23, 42, 0.9);
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.hp-bar-inner {
+  width: 100%;
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.castle-bar .hp-bar-inner {
+  background: linear-gradient(90deg, #38bdf8, #2563eb);
+}
+
+.player-bar .hp-bar-inner {
+  background: linear-gradient(90deg, #4ade80, #16a34a);
+}
+
+/* 우측 코인 & 액션 버튼 */
+.hud-right-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.coin-panel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, rgba(66, 32, 6, 0.9), rgba(28, 25, 23, 0.9));
+  border-color: #fbbf24;
+  min-width: clamp(145px, 14vw, 195px);
+}
+
+.coin-icon-3d {
+  font-size: clamp(24px, 2.2vw, 34px);
+  filter: drop-shadow(0 3px 6px rgba(251, 191, 36, 0.5));
+  animation: coinPulse 2s infinite ease-in-out;
+}
+
+@keyframes coinPulse {
+  0%,
+  100% {
+    transform: scale(1) rotate(-5deg);
+  }
+  50% {
+    transform: scale(1.1) rotate(8deg);
+  }
+}
+
+.coin-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.coin-caption {
+  font-size: clamp(10px, 0.78vw, 12px);
+  color: #fde68a;
+  font-weight: 700;
+}
+
+#coin-count {
+  font-size: clamp(20px, 1.9vw, 28px);
+  font-weight: 900;
+  color: #fef08a;
+  line-height: 1.05;
+}
+
+.hud-actions {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
+}
+
+.hud-btn {
+  background: var(--panel-bg);
+  color: #f1f5f9;
+  border: 1.5px solid var(--panel-border);
+  border-radius: 10px;
+  padding: 6px 11px;
+  font-size: clamp(11px, 0.85vw, 13px);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease;
+}
+
+.hud-btn:hover {
+  background: rgba(51, 65, 85, 0.95);
+  transform: translateY(-1px);
+}
+
+/* 중앙 스테이지 배너 */
+.center-banner {
+  align-self: center;
+  background: rgba(15, 23, 42, 0.88);
+  border: 2px solid #fbbf24;
+  border-radius: 20px;
+  padding: 14px 36px;
+  text-align: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.center-banner.hidden {
+  opacity: 0;
+  transform: translateY(-12px) scale(0.95);
+  pointer-events: none;
+}
+
+.banner-sub {
+  font-size: clamp(12px, 1vw, 15px);
+  font-weight: 800;
+  color: #fbbf24;
+  letter-spacing: 0.08em;
+}
+
+.banner-main {
+  font-size: clamp(20px, 2vw, 30px);
+  font-weight: 900;
+  color: #ffffff;
+  margin-top: 2px;
+}
+
+/* 하단 컨트롤 & 방어탑 선택 바 */
+.hud-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.tower-selector-bar {
+  background: var(--panel-bg);
+  backdrop-filter: blur(8px);
+  border: 2px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 8px 14px;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.selector-label {
+  font-size: clamp(10px, 0.8vw, 12px);
+  color: #cbd5e1;
+  font-weight: 700;
+  text-align: center;
+}
+
+.tower-cards {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.tower-card,
+.skill-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 6px 12px;
+  color: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.tower-card:hover,
+.skill-card:hover {
+  border-color: rgba(251, 191, 36, 0.7);
+  transform: translateY(-2px);
+}
+
+.tower-card.active {
+  background: linear-gradient(135deg, rgba(180, 83, 9, 0.85), rgba(120, 53, 15, 0.9));
+  border-color: #fde047;
+  box-shadow: 0 0 14px rgba(251, 191, 36, 0.45);
+}
+
+.skill-card {
+  background: linear-gradient(135deg, rgba(30, 64, 175, 0.88), rgba(15, 23, 42, 0.92));
+  border-color: #38bdf8;
+}
+
+.skill-card.cooldown {
+  opacity: 0.65;
+  border-color: #64748b;
+}
+
+.key-hint {
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: clamp(10px, 0.75vw, 11px);
+  font-weight: 800;
+  color: #fde047;
+}
+
+.tower-emoji {
+  font-size: clamp(18px, 1.5vw, 24px);
+}
+
+.tower-meta {
+  display: flex;
+  flex-direction: column;
+}
+
+.tower-meta strong {
+  font-size: clamp(11px, 0.92vw, 14px);
+  font-weight: 800;
+}
+
+.tower-meta span {
+  font-size: clamp(10px, 0.75vw, 11.5px);
+  color: #cbd5e1;
+}
+
+.control-guide {
+  background: rgba(15, 23, 42, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  padding: 5px 18px;
+  display: flex;
+  gap: 18px;
+  font-size: clamp(10.5px, 0.82vw, 13px);
+  color: #e2e8f0;
+}
+
+.control-guide strong {
+  color: #fde047;
+}
+
+/* 모달 오버레이 */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(9, 13, 22, 0.72);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+  padding: 20px;
+}
+
+.modal-overlay.hidden {
+  display: none;
+}
+
+.modal-card {
+  background: linear-gradient(160deg, #1e293b 0%, #0f172a 100%);
+  border: 3px solid #fbbf24;
+  border-radius: 24px;
+  max-width: 580px;
+  width: 100%;
+  padding: clamp(20px, 2.5vw, 34px);
+  text-align: center;
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.75);
+}
+
+.modal-badge {
+  display: inline-block;
+  background: rgba(251, 191, 36, 0.18);
+  border: 1px solid #fbbf24;
+  color: #fde047;
+  font-weight: 800;
+  font-size: 12px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+}
+
+.modal-card h1 {
+  font-size: clamp(26px, 2.6vw, 38px);
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 12px;
+}
+
+.modal-card p {
+  font-size: clamp(13px, 1.05vw, 15.5px);
+  line-height: 1.6;
+  color: #cbd5e1;
+  margin-bottom: 20px;
+}
+
+.modal-features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+  text-align: left;
+}
+
+.feature-item {
+  background: rgba(30, 41, 59, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.f-icon {
+  font-size: 22px;
+}
+
+.feature-item strong {
+  display: block;
+  font-size: 13px;
+  color: #fef08a;
+  margin-bottom: 2px;
+}
+
+.feature-item small {
+  font-size: 11.5px;
+  color: #94a3b8;
+  line-height: 1.35;
+}
+
+.modal-cta-btn {
+  background: linear-gradient(135deg, #facc15 0%, #f59e0b 100%);
+  color: #0f172a;
+  border: none;
+  border-radius: 999px;
+  padding: 14px 36px;
+  font-size: clamp(15px, 1.25vw, 18px);
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 10px 25px rgba(245, 158, 11, 0.45);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.modal-cta-btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 14px 32px rgba(245, 158, 11, 0.65);
+}
