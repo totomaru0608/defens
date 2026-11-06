@@ -78,3 +78,4 @@ export function clearGroupChildren(group) {
     group.remove(group.children[0]);
   }
 }
+

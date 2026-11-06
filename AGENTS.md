@@ -18,3 +18,4 @@
 ## 3. 코드 재사용(DRY) 및 무중단 업데이트(Zero-Downtime)
 - 3D 메쉬와 머티리얼은 반드시 공통 팩토리 함수와 캐시(`meshFactory`)를 재사용하여 중복 생성을 막습니다.
 - 모든 신규 건물·단계·유닛 증설은 `src/data/kingdomConfig.js` 레지스트리와 `src/core/liveReloadGuard.js` 스냅샷 규약을 따라, 플레이 도중 업데이트되어도 진행 중인 게임이 절대 초기화되지 않도록 합니다.
+

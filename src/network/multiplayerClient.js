@@ -1,14 +1,12 @@
 import * as THREE from 'three';
 import { MAP_BOUNDS } from '../world.js';
 import { eventBus } from '../core/eventBus.js';
+import { getStandardMat, createCylinder, createCone, createGroundRing } from '../core/meshFactory.js';
 
 /**
- * 🌐 다중 사용자(Multiplayer) 네트워크 & 협동(Co-op) 플레이어 동기화 모듈
+ * 🌐 다중 사용자(Multiplayer) 네트워크 & 협동(Co-op) 플레이어 동기화 모듈 (Strict <300줄 준수)
  * - WebSocket 룸 서버(/ws-kingdom) 및 BroadcastChannel 이중 동기화 지원
- * - 서버 패치/재시작 시에도 자동 재연결(Auto-Reconnect) 및 로컬 상태 보존으로
- *   진행 중인 게임이 절대 중단되지 않는(Zero-Downtime) 구조
- * - 혼자 접속했을 때도 다중 사용자 협동 느낌을 체험할 수 있도록
- *   역할 분담형 협동 파트너(수렵가 아린 · 개척영주 볼드)가 함께 활동합니다.
+ * - 서버 패치/재시작 시에도 자동 재연결(Auto-Reconnect) 및 로컬 상태 보존으로 무중단 동작
  */
 export class RemotePlayerAvatar {
   constructor(scene, id, name, role, colorHex, x, z, isBot = false) {
@@ -30,43 +28,12 @@ export class RemotePlayerAvatar {
 
   buildMesh(colorHex) {
     const group = new THREE.Group();
-    const armorMat = new THREE.MeshStandardMaterial({
-      color: colorHex,
-      roughness: 0.5,
-      flatShading: true,
-    });
-    const goldMat = new THREE.MeshStandardMaterial({
-      color: 0xfacc15,
-      metalness: 0.4,
-      roughness: 0.3,
-      flatShading: true,
-    });
-    const skinMat = new THREE.MeshStandardMaterial({
-      color: 0xfde68a,
-      roughness: 0.65,
-      flatShading: true,
-    });
-
-    const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.5, 0.98, 8), armorMat);
-    torso.position.y = 0.7;
-    torso.castShadow = true;
-    group.add(torso);
-
-    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 0), skinMat);
+    const torso = createCylinder(0.38, 0.5, 0.98, 8, colorHex, 0.5, { y: 0.7 });
+    const head = new THREE.Mesh(new THREE.DodecahedronGeometry(0.35, 0), getStandardMat(0xfde68a, 0.65));
     head.position.y = 1.42;
-    group.add(head);
-
-    const helm = new THREE.Mesh(new THREE.ConeGeometry(0.4, 0.38, 7), goldMat);
-    helm.position.y = 1.74;
-    group.add(helm);
-
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.75, 0.98, 20).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ color: colorHex, side: THREE.DoubleSide })
-    );
-    ring.position.y = 0.08;
-    group.add(ring);
-
+    const helm = createCone(0.4, 0.38, 7, 0xfacc15, 0.35, { y: 1.74 });
+    const ring = createGroundRing(0.75, 0.98, colorHex, { y: 0.08 });
+    group.add(torso, head, helm, ring);
     return group;
   }
 
@@ -78,17 +45,11 @@ export class RemotePlayerAvatar {
         this.position.lerp(this.targetPos, Math.min(1, 10 * dt));
         this.mesh.rotation.y = Math.atan2(toTarget.x, toTarget.z);
       }
-      this.mesh.position.set(
-        this.position.x,
-        Math.abs(Math.sin(elapsed * 7)) * 0.1,
-        this.position.z
-      );
+      this.mesh.position.set(this.position.x, Math.abs(Math.sin(elapsed * 7)) * 0.1, this.position.z);
       return;
     }
 
-    // 협동 파트너 AI (숲 사냥 · 침략군 수비 분담)
     if (this.attackCooldown > 0) this.attackCooldown -= dt;
-
     let goal = null;
     let targetEnemy = null;
     let bestEnemyDist = 14.0;
@@ -120,30 +81,21 @@ export class RemotePlayerAvatar {
       }
     }
 
-    if (!goal && survivors.length > 0) {
-      goal = survivors[0].position;
-    }
+    if (!goal && survivors.length > 0) goal = survivors[0].position;
 
     if (goal) {
       const dir = new THREE.Vector3().subVectors(goal, this.position);
       dir.y = 0;
       if (dir.length() > 1.3) {
         dir.normalize();
-        this.position.addScaledVector(
-          dir,
-          7.6 * dt
-        );
+        this.position.addScaledVector(dir, 7.6 * dt);
         this.position.x = THREE.MathUtils.clamp(this.position.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
         this.position.z = THREE.MathUtils.clamp(this.position.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
         this.mesh.rotation.y = Math.atan2(dir.x, dir.z);
       }
     }
 
-    this.mesh.position.set(
-      this.position.x,
-      Math.abs(Math.sin(elapsed * 7.5)) * 0.12,
-      this.position.z
-    );
+    this.mesh.position.set(this.position.x, Math.abs(Math.sin(elapsed * 7.5)) * 0.12, this.position.z);
   }
 
   destroy() {
@@ -157,60 +109,45 @@ export class MultiplayerNetworkManager {
     this.worldLabelsContainer = worldLabelsContainer;
     this.clientId = 'p_' + Math.random().toString(36).slice(2, 9);
     this.roomId = 'kingdom_channel_1';
-    this.peers = new Map(); // id -> { avatar, labelEl }
+    this.peers = new Map();
     this.coopBotsEnabled = true;
     this.syncTimer = 0;
     this.ws = null;
     this.bc = null;
-
     this.initChannels();
   }
 
   initChannels() {
-    // 1. 브라우저 다중 탭/창 실시간 동기화 (BroadcastChannel)
     if (typeof BroadcastChannel !== 'undefined') {
       this.bc = new BroadcastChannel('coin_kingdom_mp_v1');
       this.bc.onmessage = (ev) => this.handleIncomingPacket(ev.data);
     }
-
-    // 2. WebSocket 룸 서버 연결 시도 (서버 재시작 시에도 게임 중단 없이 자동 재연결)
     this.connectWebSocket();
   }
 
   connectWebSocket() {
     try {
       const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${proto}//${window.location.host}/ws-kingdom`;
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(`${proto}//${window.location.host}/ws-kingdom`);
       ws.onopen = () => {
         this.ws = ws;
         this.sendPacket({ type: 'join', roomId: this.roomId });
       };
       ws.onmessage = (ev) => {
         try {
-          const data = JSON.parse(ev.data);
-          this.handleIncomingPacket(data);
+          this.handleIncomingPacket(JSON.parse(ev.data));
         } catch (_) {}
       };
       ws.onclose = () => {
         this.ws = null;
         setTimeout(() => this.connectWebSocket(), 5000);
       };
-      ws.onerror = () => {
-        ws.close();
-      };
-    } catch (_) {
-      // 오프라인/로컬 환경에서는 BroadcastChannel로 무중단 동작
-    }
+      ws.onerror = () => ws.close();
+    } catch (_) {}
   }
 
   sendPacket(payload) {
-    const packet = {
-      ...payload,
-      senderId: this.clientId,
-      roomId: this.roomId,
-      ts: Date.now(),
-    };
+    const packet = { ...payload, senderId: this.clientId, roomId: this.roomId, ts: Date.now() };
     if (this.bc) {
       try {
         this.bc.postMessage(packet);
@@ -225,34 +162,21 @@ export class MultiplayerNetworkManager {
 
   handleIncomingPacket(packet) {
     if (!packet || packet.senderId === this.clientId) return;
-
     if (packet.type === 'room_welcome') {
-      if (packet.kingdom) {
-        eventBus.emit('mp:kingdom_sync', packet.kingdom);
-      }
-      if (packet.worldPatch) {
-        eventBus.emit('mp:world_patch', packet.worldPatch);
-      }
+      if (packet.kingdom) eventBus.emit('mp:kingdom_sync', packet.kingdom);
+      if (packet.worldPatch) eventBus.emit('mp:world_patch', packet.worldPatch);
       return;
     }
-
     if (packet.type === 'world_patch' && packet.patch) {
       eventBus.emit('mp:world_patch', packet.patch);
       return;
     }
-
     if (packet.type === 'state_sync') {
       let peer = this.peers.get(packet.senderId);
       if (!peer) {
         const avatar = new RemotePlayerAvatar(
-          this.scene,
-          packet.senderId,
-          packet.name || `개척자 ${packet.senderId.slice(-3)}`,
-          packet.role || '⚔️ 동맹 수비대',
-          0x10b981,
-          packet.x || 0,
-          packet.z || 0,
-          false
+          this.scene, packet.senderId, packet.name || `개척자 ${packet.senderId.slice(-3)}`,
+          packet.role || '⚔️ 동맹 수비대', 0x10b981, packet.x || 0, packet.z || 0, false
         );
         const labelEl = document.createElement('div');
         labelEl.className = 'pad-label mp-nameplate';
@@ -263,10 +187,7 @@ export class MultiplayerNetworkManager {
       }
       peer.avatar.targetPos.set(packet.x || 0, 0, packet.z || 0);
       peer.avatar.lastSeen = performance.now();
-
-      if (packet.kingdom) {
-        eventBus.emit('mp:kingdom_sync', packet.kingdom);
-      }
+      if (packet.kingdom) eventBus.emit('mp:kingdom_sync', packet.kingdom);
     } else if (packet.type === 'kingdom_upgrade') {
       eventBus.emit('mp:kingdom_sync', packet.kingdom);
     }
@@ -275,37 +196,12 @@ export class MultiplayerNetworkManager {
   initStageCoopPartners() {
     this.clearPeers();
     if (!this.coopBotsEnabled) return;
-
     const botConfigs = [
-      {
-        id: 'bot_hunter',
-        name: '아린',
-        role: '🏹 숲 수렵가',
-        color: 0x10b981,
-        x: -10,
-        z: -6,
-      },
-      {
-        id: 'bot_builder',
-        name: '볼드',
-        role: '🌾 개척 영주',
-        color: 0xa855f7,
-        x: 10,
-        z: 5,
-      },
+      { id: 'bot_hunter', name: '아린', role: '🏹 숲 수렵가', color: 0x10b981, x: -10, z: -6 },
+      { id: 'bot_builder', name: '볼드', role: '🌾 개척 영주', color: 0xa855f7, x: 10, z: 5 },
     ];
-
     for (const cfg of botConfigs) {
-      const avatar = new RemotePlayerAvatar(
-        this.scene,
-        cfg.id,
-        cfg.name,
-        cfg.role,
-        cfg.color,
-        cfg.x,
-        cfg.z,
-        true
-      );
+      const avatar = new RemotePlayerAvatar(this.scene, cfg.id, cfg.name, cfg.role, cfg.color, cfg.x, cfg.z, true);
       const labelEl = document.createElement('div');
       labelEl.className = 'pad-label mp-nameplate';
       labelEl.innerHTML = `<span>${cfg.role} · ${cfg.name}</span>`;
@@ -327,8 +223,7 @@ export class MultiplayerNetworkManager {
   }
 
   update(dt, elapsed, { playerPos, kingdomSnapshot, enemies, wildPreys, survivors, onHitEnemy, onHitPrey, worldToScreen }) {
-    this.syncTimer += dt;
-    if (this.syncTimer >= 0.15 && playerPos) {
+    if ((this.syncTimer += dt) >= 0.15 && playerPos) {
       this.syncTimer = 0;
       this.sendPacket({
         type: 'state_sync',
@@ -346,23 +241,12 @@ export class MultiplayerNetworkManager {
         this.peers.delete(id);
         continue;
       }
-
-      peer.avatar.update(dt, elapsed, {
-        enemies,
-        wildPreys,
-        survivors,
-        onHitEnemy,
-        onHitPrey,
-      });
-
-      const anchor = peer.avatar.position.clone().setY(2.25);
-      const sc = worldToScreen(anchor);
+      peer.avatar.update(dt, elapsed, { enemies, wildPreys, survivors, onHitEnemy, onHitPrey });
+      const sc = worldToScreen(peer.avatar.position.clone().setY(2.25));
+      peer.labelEl.style.display = sc.visible ? 'flex' : 'none';
       if (sc.visible) {
-        peer.labelEl.style.display = 'flex';
         peer.labelEl.style.left = `${sc.x}px`;
         peer.labelEl.style.top = `${sc.y}px`;
-      } else {
-        peer.labelEl.style.display = 'none';
       }
     }
   }

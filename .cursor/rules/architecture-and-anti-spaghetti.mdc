@@ -24,3 +24,4 @@ alwaysApply: true
 - **3D 메쉬/머티리얼 캐시 재사용**: `new THREE.MeshStandardMaterial`이나 기본 도형 생성을 각 파일마다 중복 작성하지 않고 `src/core/meshFactory.js`를 재사용한다.
 - **데이터 주도 확장**: 인과관계 건국 시스템(`사냥 12명 한계 ➔ 집 짓기 ➔ 농사·어업 ➔ 시장 체계화 ➔ 무역소 ➔ 성 ➔ 확장 문명`)과 방어 시설(`감시탑·방어탑·울타리·성벽`)은 하드코딩 분기문 대신 `src/data/kingdomConfig.js` 레지스트리로 관리한다.
 - **무중단 상태 보존**: 모든 도메인 상태 변경은 `getSnapshot()` / `applySnapshot()` 및 `liveReloadGuard.js`와 호환되어야 하며, 게임 플레이 중 업데이트가 일어나도 세션이 초기화되지 않아야 한다.
+
