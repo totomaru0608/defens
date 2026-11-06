@@ -1390,6 +1390,59 @@ body {
   border-color: #facc15;
 }
 
+.kd-fac-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1.5px solid rgba(148, 163, 184, 0.45);
+  border-radius: 9px;
+  padding: 0.28cqh 0.58cqw;
+  color: #f8fafc;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+}
+
+.kd-fac-btn span {
+  font-size: clamp(8.5px, 0.78cqw, 11.5px);
+  font-weight: 900;
+  color: #e2e8f0;
+}
+
+.kd-fac-btn small {
+  font-size: clamp(7.5px, 0.66cqw, 10px);
+  color: #94a3b8;
+  font-weight: 700;
+}
+
+.kd-fac-btn.can-afford {
+  border-color: #38bdf8;
+  background: linear-gradient(135deg, rgba(12, 74, 110, 0.9), rgba(15, 23, 42, 0.92));
+}
+
+.kd-fac-btn.can-afford span {
+  color: #7dd3fc;
+}
+
+.kd-fac-btn:hover {
+  transform: translateY(-1px);
+  border-color: #fde047;
+}
+
+.live-expand-btn {
+  border-color: #34d399;
+  color: #d1fae5;
+  background: rgba(6, 78, 59, 0.82);
+}
+
+.live-expand-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  border-color: #fde047;
+}
+
 .mp-nameplate {
   background: rgba(15, 23, 42, 0.88);
   border: 1px solid #34d399;

@@ -1,4 +1,4 @@
-import { hotPatchKingdomConfig } from '../data/kingdomConfig.js';
+import { KINGDOM_CONFIG, hotPatchKingdomConfig } from '../data/kingdomConfig.js';
 import { eventBus } from './eventBus.js';
 
 const LIVE_SESSION_KEY = 'coin_defense_live_session_v1';
@@ -7,7 +7,7 @@ const LIVE_SESSION_KEY = 'coin_defense_live_session_v1';
  * 🛡️ 무중단 업데이트 & 상태 보존 가드 (Zero-Downtime Live Reload Guard)
  * - 게임 플레이 도중 코드 패치, 밸런스/세계관 증설(Hot-Patch), 혹은 Vite HMR 리로드가 발생해도
  *   현재 진행 중인 스테이지·웨이브·보유 세금(코인)·설치된 방어탑/울타리/감시탑/성벽·
- *   마을 발전 단계(작은 마을➔타운➔시장➔무역소➔성)가 초기화되지 않고 그대로 이어집니다.
+ *   기반 시설(집🏠·농사🌾·어업🐟) 및 마을 발전 단계가 초기화되지 않고 그대로 이어집니다.
  */
 export function saveLiveSessionSnapshot(state, kingdomDomain) {
   if (!state || state.mode !== 'playing') return;
@@ -31,6 +31,8 @@ export function saveLiveSessionSnapshot(state, kingdomDomain) {
         investedCoins: p.investedCoins,
       })),
       kingdom: kingdomDomain ? kingdomDomain.getSnapshot() : null,
+      settlementChain: KINGDOM_CONFIG.settlementChain,
+      facilities: KINGDOM_CONFIG.facilities,
     };
     sessionStorage.setItem(LIVE_SESSION_KEY, JSON.stringify(snapshot));
   } catch (e) {
@@ -45,6 +47,12 @@ export function loadLiveSessionSnapshot() {
     const parsed = JSON.parse(raw);
     // 최근 30분 이내의 활성 플레이 세션이면 복구
     if (parsed && Date.now() - (parsed.ts || 0) < 30 * 60 * 1000) {
+      if (Array.isArray(parsed.settlementChain) && parsed.settlementChain.length > KINGDOM_CONFIG.settlementChain.length) {
+        KINGDOM_CONFIG.settlementChain = parsed.settlementChain;
+      }
+      if (parsed.facilities && typeof parsed.facilities === 'object') {
+        Object.assign(KINGDOM_CONFIG.facilities, parsed.facilities);
+      }
       return parsed;
     }
   } catch (_) {}
@@ -66,3 +74,4 @@ export function applyZeroDowntimeWorldPatch(patchPayload) {
   eventBus.emit('world:hot_patched', updated);
   return updated;
 }
+

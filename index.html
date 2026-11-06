@@ -69,6 +69,13 @@
                 <span id="coin-count">80</span>
               </div>
               <button
+                id="btn-live-expand"
+                class="hud-btn live-expand-btn"
+                title="게임 중단 없이 새로운 문명 단계(항구·대제국 등)나 산업 시설을 실시간으로 증설합니다"
+              >
+                🌱 무중단 확장
+              </button>
+              <button
                 id="btn-comfy"
                 class="hud-btn comfy-toggle-btn"
                 title="ComfyUI 스타일 동물(코끼리·하마·기린) 디자인 & 움직임 동작 노드 스튜디오"
@@ -149,18 +156,42 @@
                 <span id="skill-status" class="tower-label">황금 충격파</span>
               </button>
               <div class="dock-sep"></div>
-              <!-- 현실 경제 건국 체인: 작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성(Castle) -->
-              <div class="kingdom-mini-stats" title="식량(🍖) · 주민 인구(👥) · 주기별 세금 수입(🪙) · 실시간 접속자(🌐)">
+              <!-- 인과관계 건국 체인: 사냥(12명 한계) ➔ 집 짓기(인구+) ➔ 농사·어업(식량 한계 돌파) ➔ 시장(체계화) ➔ 무역소 ➔ 성 -->
+              <div class="kingdom-mini-stats" title="식량(🍖) · 주민 인구/최대 수용량(👥, 사냥만으로는 최대 12명 한계) · 주기별 세금(🪙)">
                 <span id="kd-stage-badge" class="kd-stage-pill">⛺ 1단계: 작은 마을</span>
-                <span id="kd-econ-text">🍖30 · 👥3명 · 세금+🪙13 · 🌐3</span>
+                <span id="kd-econ-text">🍖35 · 👥3/6명(사냥한계12) · 🪙+14</span>
               </div>
+              <button
+                id="btn-fac-house"
+                class="kd-fac-btn"
+                title="단축키 Q: 집을 지어 최대 인구 수용량을 +4명 늘립니다 (사냥만으로는 최대 12명 한계)"
+              >
+                <span id="fac-house-title">🏠 집 Lv.0</span>
+                <small id="fac-house-cost">🪙25·🍖15 (+4명)</small>
+              </button>
+              <button
+                id="btn-fac-farm"
+                class="kd-fac-btn"
+                title="단축키 W: 농사(밀밭·풍차)를 개간해 12명 사냥 한계를 돌파하고 식량을 대량 생산합니다"
+              >
+                <span id="fac-farm-title">🌾 농사 Lv.0</span>
+                <small id="fac-farm-cost">🪙35·🍖20 (식량++)</small>
+              </button>
+              <button
+                id="btn-fac-fishery"
+                class="kd-fac-btn"
+                title="단축키 E: 강·호수에 어업 부두를 지어 물고기를 잡고 12명 사냥 한계를 돌파합니다"
+              >
+                <span id="fac-fishery-title">🐟 어업 Lv.0</span>
+                <small id="fac-fishery-cost">🪙40·🍖20 (어획++)</small>
+              </button>
               <button
                 id="btn-kd-advance"
                 class="kd-upgrade-btn castle-btn"
-                title="세금(🪙)과 식량(🍖)을 사용해 [작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성(Castle)] 순서로 발전시킵니다 (단축키 5)"
+                title="단축키 5: [작은 마을 ➔ 타운 ➔ 시장(농·어업 체계화!) ➔ 무역소 ➔ 성(Castle)] 순서로 문명을 발전시킵니다"
               >
-                <span id="kd-next-title">🏘️ 타운 건설 (2단계)</span>
-                <small id="kd-next-cost">🪙110 · 🍖40 필요</small>
+                <span id="kd-next-title">🏘️ 타운 건설 (2/5)</span>
+                <small id="kd-next-cost">🪙60·🍖35·👥6·농/어1</small>
               </button>
             </div>
 

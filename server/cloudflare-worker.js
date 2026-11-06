@@ -143,3 +143,4 @@ export default {
     return new Response('Coin Kingdom Defense Cloudflare Worker Active', { status: 200 });
   },
 };
+

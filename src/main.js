@@ -34,6 +34,7 @@ import {
 } from './core/liveReloadGuard.js';
 import { KingdomDomainManager } from './domains/kingdomDomain.js';
 import { MultiplayerNetworkManager } from './network/multiplayerClient.js';
+import { KINGDOM_CONFIG } from './data/kingdomConfig.js';
 
 // DOM 참조
 const viewportEl = document.getElementById('game-viewport');
@@ -56,6 +57,20 @@ const kdEconTextEl = document.getElementById('kd-econ-text');
 const kdAdvanceBtnEl = document.getElementById('btn-kd-advance');
 const kdNextTitleEl = document.getElementById('kd-next-title');
 const kdNextCostEl = document.getElementById('kd-next-cost');
+
+const facHouseBtnEl = document.getElementById('btn-fac-house');
+const facHouseTitleEl = document.getElementById('fac-house-title');
+const facHouseCostEl = document.getElementById('fac-house-cost');
+
+const facFarmBtnEl = document.getElementById('btn-fac-farm');
+const facFarmTitleEl = document.getElementById('fac-farm-title');
+const facFarmCostEl = document.getElementById('fac-farm-cost');
+
+const facFisheryBtnEl = document.getElementById('btn-fac-fishery');
+const facFisheryTitleEl = document.getElementById('fac-fishery-title');
+const facFisheryCostEl = document.getElementById('fac-fishery-cost');
+
+const liveExpandBtnEl = document.getElementById('btn-live-expand');
 
 const centerBannerEl = document.getElementById('center-banner');
 const bannerSubEl = document.getElementById('banner-subtitle');
@@ -1669,23 +1684,182 @@ document.querySelectorAll('.tower-card').forEach((btn) => {
   });
 });
 
-// 🏛️ 문명 건국 단계 발전: [1. 아주 작은 마을] ➔ [2. 타운 건설] ➔ [3. 시장 완성] ➔ [4. 무역소 개설] ➔ [5. 성(Castle) 완성]
+// 🏗️ 인과관계 기반 시설 증축 (🏠 집 짓기 / 🌾 농사 / 🐟 어업)
+function triggerBuildFacility(facId) {
+  if (state.mode === 'intro') {
+    sfx.init();
+    modalOverlayEl.classList.add('hidden');
+    state.mode = 'playing';
+  }
+  if (state.mode !== 'playing') return;
+
+  const built = kingdomDomain.constructFacility(
+    facId,
+    {
+      getCoins: () => state.coins,
+      spendCoins: (amt) => {
+        state.coins = Math.max(0, state.coins - amt);
+      },
+    },
+    (sub, title) => showBanner(sub, title, 2300),
+    spawnFloatingText
+  );
+
+  if (built) {
+    sfx.playTowerBuilt();
+    mpNetwork.sendPacket({
+      type: 'kingdom_upgrade',
+      kingdom: kingdomDomain.getSnapshot(),
+    });
+    saveLiveSessionSnapshot(state, kingdomDomain);
+    updateHud();
+  }
+}
+
+if (facHouseBtnEl) {
+  facHouseBtnEl.addEventListener('click', () => triggerBuildFacility('house'));
+}
+if (facFarmBtnEl) {
+  facFarmBtnEl.addEventListener('click', () => triggerBuildFacility('farm'));
+}
+if (facFisheryBtnEl) {
+  facFisheryBtnEl.addEventListener('click', () => triggerBuildFacility('fishery'));
+}
+
+// 🌱 무중단 문명·세계관 확장 (Zero-Downtime Program & Worldview Expansion)
+const EXPANSION_STAGE_TEMPLATES = [
+  {
+    id: 'harbor_metropolis',
+    name: '대항구 교역도시',
+    badge: '⚓ 6단계: 대항구 교역도시',
+    shortLabel: '⚓ 대항구 도시',
+    desc: '성(Castle) 너머 해안과 강 하구에 원양 범선 항구를 건설해 대륙 간 해양 무역과 원양 어업을 개척했습니다!',
+  },
+  {
+    id: 'royal_academy_capital',
+    name: '왕립 학술 수도',
+    badge: '🏛️ 7단계: 왕립 학술 수도',
+    shortLabel: '🏛️ 왕립 수도',
+    desc: '왕립 대학과 과학 공방을 설립하여 자동화 농기구와 대형 조선술로 식량·세금 생산을 극대화했습니다!',
+  },
+  {
+    id: 'golden_empire',
+    name: '황금 대제국',
+    badge: '👑 8단계: 황금 대제국',
+    shortLabel: '👑 황금 대제국',
+    desc: '수많은 타운과 시장·무역소·항구를 하나로 묶어 대륙을 호령하는 영원한 황금 대제국을 완성했습니다!',
+  },
+];
+
+function triggerZeroDowntimeExpansion() {
+  if (state.mode === 'intro') {
+    sfx.init();
+    modalOverlayEl.classList.add('hidden');
+    state.mode = 'playing';
+  }
+  const nextStepNum = KINGDOM_CONFIG.settlementChain.length + 1;
+  const tplIdx = nextStepNum - 6;
+  const tpl = EXPANSION_STAGE_TEMPLATES[tplIdx] || {
+    id: `era_stage_${nextStepNum}`,
+    name: `신세계 제${nextStepNum}문명`,
+    badge: `🌟 ${nextStepNum}단계: 신세계 문명`,
+    shortLabel: `🌟 ${nextStepNum}단계 문명`,
+    desc: `게임 중단 없이 실시간으로 확장된 제${nextStepNum}단계 문명 세계관입니다!`,
+  };
+
+  const newStagePayload = {
+    step: nextStepNum,
+    id: tpl.id,
+    name: tpl.name,
+    badge: tpl.badge,
+    shortLabel: tpl.shortLabel,
+    desc: tpl.desc,
+    reqCoins: 200 + (nextStepNum - 5) * 90,
+    reqFood: 120 + (nextStepNum - 5) * 50,
+    reqPop: 14 + (nextStepNum - 5) * 4,
+    reqFoodFacilityLevels: 3 + (nextStepNum - 5),
+    baseTaxPerCycle: 90 + (nextStepNum - 5) * 35,
+    foodPerSec: 22 + (nextStepNum - 5) * 7,
+    agriFishMultiplier: +(2.8 + (nextStepNum - 5) * 0.5).toFixed(1),
+    castleMaxHpBonus: 380 + (nextStepNum - 5) * 160,
+    combatMultiplier: +(2.25 + (nextStepNum - 5) * 0.35).toFixed(2),
+    autoGuardDamage: 60 + (nextStepNum - 5) * 22,
+  };
+
+  applyZeroDowntimeWorldPatch({ AppendStage: newStagePayload });
+  mpNetwork.sendPacket({
+    type: 'world_patch',
+    patch: { AppendStage: newStagePayload },
+  });
+
+  // 백엔드 서버(/api/world-patch)에도 비동기 브로드캐스트 (오프라인이어도 로컬 무중단 동작)
+  fetch('/api/world-patch', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ AppendStage: newStagePayload }),
+  }).catch(() => {});
+
+  sfx.playTowerBuilt();
+  saveLiveSessionSnapshot(state, kingdomDomain);
+  updateHud();
+  showBanner(
+    `🌱 무중단 세계관 확장 완료! (${tpl.badge})`,
+    `전투·마을·세금 중단 없이 [${tpl.name}] 단계가 프로그램에 즉시 증설되었습니다!`,
+    2600
+  );
+}
+
+if (liveExpandBtnEl) {
+  liveExpandBtnEl.addEventListener('click', () => {
+    triggerZeroDowntimeExpansion();
+  });
+}
+
+// 🏛️ 문명 건국 단계 발전: [1. 아주 작은 마을] ➔ [2. 타운 건설] ➔ [3. 시장 완성(농·어업 체계화)] ➔ [4. 무역소 개설] ➔ [5. 성(Castle) 완성] ➔ [6+ 무중단 확장]
 function advanceKingdomSettlement() {
   if (state.mode !== 'playing') return;
   const nextDef = kingdomDomain.getNextStepDef();
   if (!nextDef) {
-    showBanner('🏰 대성곽(Castle) 완성 달성!', '최종 5단계 성(Castle)까지 모두 완성되어 최고 세금·자동 수비 상태입니다!', 1800);
+    showBanner(
+      '🏰 현재 최종 문명 단계 달성!',
+      '우측 상단 [🌱 무중단 확장] 버튼을 누르면 게임을 멈추지 않고 6단계(대항구)·7단계(왕립 수도) 문명을 계속 증설할 수 있습니다!',
+      2500
+    );
     return;
   }
 
   const reqCoins = nextDef.reqCoins || 0;
   const reqFood = nextDef.reqFood || 0;
+  const reqPop = nextDef.reqPop || 0;
+  const reqFoodFac = nextDef.reqFoodFacilityLevels || 0;
+  const curFoodFac = kingdomDomain.getTotalFoodFacilityLevels();
 
+  // 1) 집(🏠)을 지어 인구를 먼저 확보해야 하는 인과관계 체크
+  if (kingdomDomain.population < reqPop) {
+    showBanner(
+      `👥 인구 부족 (현재 ${kingdomDomain.population}명 / 필요 ${reqPop}명)`,
+      `${nextDef.badge} 단계로 가려면 먼저 [🏠 집]을 지어 수용 인구를 늘리고 숲에서 주민을 모으세요! (사냥만으론 12명 한계)`,
+      2500
+    );
+    return;
+  }
+
+  // 2) 사냥 한계를 넘어 농사(🌾) 또는 어업(🐟) 기반이 갖춰져야 타운/시장(체계화)으로 발전 가능
+  if (curFoodFac < reqFoodFac) {
+    showBanner(
+      `🌾 농사 · 🐟 어업 기반 부족 (현재 합산 Lv.${curFoodFac} / 필요 Lv.${reqFoodFac})`,
+      `사냥만으로는 식량 한계가 있습니다! ${nextDef.badge} 건설 및 체계화를 위해 [🌾 농사] 또는 [🐟 어업]을 먼저 확충하세요!`,
+      2600
+    );
+    return;
+  }
+
+  // 3) 세금(🪙)과 식량(🍖) 체크
   if (state.coins < reqCoins || kingdomDomain.food < reqFood) {
     showBanner(
       '🪙 세금(돈) 또는 🍖 식량 부족',
       `${nextDef.badge} 건설에는 🪙${reqCoins} 세금, 🍖${reqFood} 식량이 필요합니다! (현재: 🪙${state.coins}, 🍖${kingdomDomain.food})`,
-      2000
+      2200
     );
     return;
   }
@@ -1705,10 +1879,10 @@ function advanceKingdomSettlement() {
   spawnRingEffect(kingdomDomain.castleEndPt, 5.2, 0xfacc15, 0.48);
   spawnFloatingText(
     kingdomDomain.castleEndPt.clone().setY(3.8),
-    `${curDef.badge} 완성! (성채 HP +${deltaHp})`,
+    `${curDef.badge} 완성! (농·어업 효율 x${curDef.agriFishMultiplier || 1})`,
     '#fde047'
   );
-  showBanner(`🏛️ 문명 발전: ${curDef.badge}`, curDef.desc, 2400);
+  showBanner(`🏛️ 문명 발전: ${curDef.badge}`, curDef.desc, 2600);
 
   mpNetwork.sendPacket({
     type: 'kingdom_upgrade',
@@ -1741,6 +1915,9 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '3') selectTowerType('frost');
   if (e.key === '4') selectTowerType('wall');
   if (e.key === '5') advanceKingdomSettlement();
+  if (e.key === 'q' || e.key === 'Q') triggerBuildFacility('house');
+  if (e.key === 'w' || e.key === 'W') triggerBuildFacility('farm');
+  if (e.key === 'e' || e.key === 'E') triggerBuildFacility('fishery');
   if (e.code === 'Space') {
     e.preventDefault();
     triggerPlayerSkill();
@@ -1809,29 +1986,56 @@ function updateHud() {
 
   coinCountEl.textContent = `${state.coins}`;
 
-  // 🏛️ 상단 문명 단계 & 식량/인구/세금/동맹 현황 및 하단 발전 버튼 업데이트
+  // 🏛️ 상단 문명 단계 & 식량/인구(12명 사냥 한계 표시)/세금/동맹 현황 및 하단 시설·발전 버튼 업데이트
   const curStepDef = kingdomDomain.getCurrentStepDef();
   const nextStepDef = kingdomDomain.getNextStepDef();
+  const effMaxPop = kingdomDomain.getEffectiveMaxPopulation();
+  const netFood = kingdomDomain.getNetFoodPerSec();
+  const netFoodStr = netFood >= 0 ? `+${netFood}/s` : `${netFood}/s`;
+  const huntCapTag = kingdomDomain.isRelyingOnlyOnHunting() ? '(사냥한계12)' : `(체계화x${kingdomDomain.getAgriFishMultiplier()})`;
+
   if (kdStageBadgeEl && curStepDef) {
     kdStageBadgeEl.textContent = curStepDef.badge;
   }
   if (kdEconTextEl) {
-    kdEconTextEl.textContent = `🍖식량 ${kingdomDomain.food}(+${kingdomDomain.getFoodPerSec()}/s) · 👥인구 ${kingdomDomain.population}명 · 🪙세금 +${kingdomDomain.getTaxPerCycle()} · 🌐동맹 ${mpNetwork.getActivePlayerCount()}명`;
+    kdEconTextEl.textContent = `🍖${kingdomDomain.food}(${netFoodStr}) · 👥${kingdomDomain.population}/${effMaxPop}명${huntCapTag} · 🪙세금+${kingdomDomain.getTaxPerCycle()}`;
   }
+
+  // 🏠 집 / 🌾 농사 / 🐟 어업 버튼 상태 갱신
+  const updateFacBtn = (facId, btnEl, titleEl, costEl, labelPrefix, effectHint) => {
+    if (!btnEl || !titleEl || !costEl) return;
+    const lv = kingdomDomain.getFacilityLevel(facId);
+    const cost = kingdomDomain.getFacilityNextCost(facId);
+    const canAfford = state.coins >= cost.coins && kingdomDomain.food >= cost.food;
+    btnEl.classList.toggle('can-afford', canAfford);
+    titleEl.textContent = `${labelPrefix} Lv.${lv}`;
+    costEl.textContent = `🪙${cost.coins}·🍖${cost.food} (${effectHint})`;
+  };
+
+  updateFacBtn('house', facHouseBtnEl, facHouseTitleEl, facHouseCostEl, '🏠 집', '+4명');
+  updateFacBtn('farm', facFarmBtnEl, facFarmTitleEl, facFarmCostEl, '🌾 농사', '+식량');
+  updateFacBtn('fishery', facFisheryBtnEl, facFisheryTitleEl, facFisheryCostEl, '🐟 어업', '+물고기');
+
   if (kdAdvanceBtnEl && kdNextTitleEl && kdNextCostEl) {
+    const totalStages = KINGDOM_CONFIG.settlementChain.length;
     if (nextStepDef) {
+      const reqPop = nextStepDef.reqPop || 0;
+      const reqFoodFac = nextStepDef.reqFoodFacilityLevels || 0;
+      const curFoodFac = kingdomDomain.getTotalFoodFacilityLevels();
       const canAfford =
         state.coins >= (nextStepDef.reqCoins || 0) &&
-        kingdomDomain.food >= (nextStepDef.reqFood || 0);
-      kdAdvanceBtnEl.classList.toggle('can-afford', canAfford);
+        kingdomDomain.food >= (nextStepDef.reqFood || 0) &&
+        kingdomDomain.population >= reqPop &&
+        curFoodFac >= reqFoodFac;
+      kdAdvanceBtnEl.classList.toggle('ready', canAfford);
       kdAdvanceBtnEl.classList.remove('maxed');
-      kdNextTitleEl.textContent = `${nextStepDef.name} (${nextStepDef.step}/5)`;
-      kdNextCostEl.textContent = `🪙${nextStepDef.reqCoins} 세금 · 🍖${nextStepDef.reqFood} 식량`;
+      kdNextTitleEl.textContent = `${nextStepDef.shortLabel || nextStepDef.name} (${nextStepDef.step}/${totalStages})`;
+      kdNextCostEl.textContent = `🪙${nextStepDef.reqCoins}·🍖${nextStepDef.reqFood}·👥${reqPop}·농/어Lv.${reqFoodFac}`;
     } else {
-      kdAdvanceBtnEl.classList.remove('can-afford');
+      kdAdvanceBtnEl.classList.remove('ready');
       kdAdvanceBtnEl.classList.add('maxed');
-      kdNextTitleEl.textContent = '🏰 5단계: 대성곽 완성됨';
-      kdNextCostEl.textContent = '👑 왕국 최종 단계 달성!';
+      kdNextTitleEl.textContent = `🏰 ${totalStages}단계 완성!`;
+      kdNextCostEl.textContent = '🌱 우측상단 [무중단 확장] 가능';
     }
   }
 
