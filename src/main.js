@@ -147,7 +147,8 @@ scene.add(editorState.previewGroup);
 
 // 게임 상태 관리
 const state = {
-  mode: 'intro', // 'intro' | 'playing' | 'editor' | 'stage_clear' | 'victory' | 'defeat'
+  mode: 'intro', // 'intro' | 'playing' | 'stage_clear' | 'victory' | 'defeat'
+  editorOpen: false,
   stageIndex: 0,
   coins: 80,
   castleHp: 100,
@@ -313,8 +314,9 @@ inpScaleMult.addEventListener('input', onComfySliderChange);
 // 전장에 동물 적 즉시 소환 헬퍼
 function spawnAnimalIntoStage(animalType, count = 2) {
   if (!state.world) return;
-  if (state.mode === 'editor') {
-    loadStage(state.stageIndex, false);
+  if (state.mode !== 'playing') {
+    modalOverlayEl.classList.add('hidden');
+    loadStage(state.stageIndex, state.editorOpen);
   }
   const stageMult = 1 + state.stageIndex * 0.22;
   for (let i = 0; i < count; i++) {
@@ -489,8 +491,9 @@ function refreshStageSelectUI() {
 stageSelectEl.addEventListener('change', () => {
   const idx = parseInt(stageSelectEl.value, 10);
   if (!Number.isNaN(idx) && STAGES[idx]) {
-    const keepEditor = state.mode === 'editor';
-    loadStage(idx, keepEditor);
+    sfx.init();
+    modalOverlayEl.classList.add('hidden');
+    loadStage(idx, state.editorOpen);
   }
 });
 
@@ -541,8 +544,8 @@ function rebuildPadsForCurrentStage() {
   });
 }
 
-// 스테이지 로드 및 초기화
-function loadStage(stageIndex, enterEditor = false) {
+// 스테이지 로드 및 초기화 (언제나 웨이브 진행이 멈추지 않도록 즉시 활성화)
+function loadStage(stageIndex, keepEditorOpen = false) {
   clearCurrentStage();
 
   state.stageIndex = Math.max(0, Math.min(STAGES.length - 1, stageIndex));
@@ -572,14 +575,10 @@ function loadStage(stageIndex, enterEditor = false) {
   rebuildPadsForCurrentStage();
   refreshStageSelectUI();
 
-  if (enterEditor) {
-    setEditorMode(true);
-  } else {
-    setEditorMode(false);
-    prepareWave(0);
-    state.mode = 'playing';
-    showBanner(`STAGE ${state.stageIndex + 1}`, `${stageData.name} 방어 시작!`);
-  }
+  prepareWave(0);
+  state.mode = 'playing';
+  setEditorMode(keepEditorOpen, true);
+  showBanner(`STAGE ${state.stageIndex + 1} / ${STAGES.length}`, `${stageData.name} 방어 시작!`);
   updateHud();
 }
 
@@ -605,7 +604,7 @@ function prepareWave(waveIdx) {
   state.spawnQueue.sort((a, b) => a.spawnTime - b.spawnTime);
 
   if (waveIdx > 0) {
-    showBanner(`STAGE ${stageData.id}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1500);
+    showBanner(`STAGE ${state.stageIndex + 1}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1500);
   }
 }
 
@@ -617,7 +616,7 @@ function rebuildEditorGhostPreview() {
   while (editorState.previewGroup.children.length > 0) {
     editorState.previewGroup.remove(editorState.previewGroup.children[0]);
   }
-  if (state.mode !== 'editor') {
+  if (!state.editorOpen) {
     editorState.previewGroup.visible = false;
     return;
   }
@@ -661,24 +660,18 @@ function rebuildEditorGhostPreview() {
   }
 }
 
-function setEditorMode(enabled) {
-  if (enabled) {
-    state.mode = 'editor';
-    state.enemies.forEach((e) => e.destroy());
-    state.enemies = [];
-    state.projectiles.forEach((p) => p.destroy());
-    state.projectiles = [];
-    state.coinsList.forEach((c) => c.destroy());
-    state.coinsList = [];
-
+function setEditorMode(enabled, silentBanner = false) {
+  state.editorOpen = Boolean(enabled);
+  if (state.editorOpen) {
     editorBtnEl.classList.add('active');
     editorTopbarEl.classList.remove('hidden');
     editorDockEl.classList.remove('hidden');
     combatDockEl.classList.add('hidden');
-    if (state.player) state.player.targetMarker.visible = false;
 
     rebuildEditorGhostPreview();
-    showBanner('🛠️ 스테이지 & 지형 에디터', '클릭: 지형물 배치 · 우클릭/삭제브러시: 지형물 삭제', 2200);
+    if (!silentBanner) {
+      showBanner('🛠️ 스테이지 & 지형 에디터', '전투 진행 중 실시간 지형물 배치 · 우클릭: 삭제', 2000);
+    }
   } else {
     editorBtnEl.classList.remove('active');
     editorTopbarEl.classList.add('hidden');
@@ -687,21 +680,27 @@ function setEditorMode(enabled) {
     editorState.previewGroup.visible = false;
     if (state.player) state.player.targetMarker.visible = true;
   }
+  updateHud();
 }
 
 editorBtnEl.addEventListener('click', () => {
   if (state.mode === 'intro') {
+    sfx.init();
     modalOverlayEl.classList.add('hidden');
+    state.mode = 'playing';
   }
-  if (state.mode === 'editor') {
-    loadStage(state.stageIndex, false);
-  } else {
-    loadStage(state.stageIndex, true);
-  }
+  setEditorMode(!state.editorOpen);
 });
 
 edPlayBtn.addEventListener('click', () => {
-  loadStage(state.stageIndex, false);
+  modalOverlayEl.classList.add('hidden');
+  setEditorMode(false);
+  if (state.mode !== 'playing') {
+    loadStage(state.stageIndex, false);
+  } else {
+    const stageData = STAGES[state.stageIndex];
+    showBanner(`STAGE ${state.stageIndex + 1} / ${STAGES.length}`, `${stageData.name} 전투 진행 중!`, 1500);
+  }
 });
 
 document.querySelectorAll('.brush-btn').forEach((btn) => {
@@ -757,8 +756,13 @@ edAddStageBtn.addEventListener('click', () => {
   const newStage = createNewStageTemplate(STAGES.length + 1);
   STAGES.push(newStage);
   saveStages(STAGES);
-  loadStage(STAGES.length - 1, true);
-  showBanner('스테이지 추가 완료', `STAGE ${STAGES.length} (${newStage.name}) 생성됨!`, 1800);
+  modalOverlayEl.classList.add('hidden');
+  loadStage(STAGES.length - 1, state.editorOpen);
+  showBanner(
+    `STAGE ${STAGES.length} 추가 및 출격!`,
+    `${newStage.name} — 웨이브가 즉시 시작됩니다!`,
+    2200
+  );
 });
 
 edDelStageBtn.addEventListener('click', () => {
@@ -770,15 +774,15 @@ edDelStageBtn.addEventListener('click', () => {
   STAGES.splice(state.stageIndex, 1);
   saveStages(STAGES);
   const nextIdx = Math.max(0, state.stageIndex - 1);
-  loadStage(nextIdx, true);
+  loadStage(nextIdx, state.editorOpen);
   showBanner('스테이지 삭제됨', `'${removedName}' 스테이지가 삭제되었습니다.`, 1600);
 });
 
 edResetAllBtn.addEventListener('click', () => {
   const defaults = resetStagesToDefault();
   setStagesList(defaults);
-  loadStage(0, true);
-  showBanner('기본값 복원 완료', '기본 5개 스테이지와 지형물로 복원되었습니다.', 1800);
+  loadStage(0, state.editorOpen);
+  showBanner('기본값 복원 완료', `기본 ${STAGES.length}개 스테이지와 지형물로 복원되었습니다.`, 1800);
 });
 
 function eraseNearestAtPoint(worldPt) {
@@ -885,7 +889,8 @@ function updateGroundRaycastFromMouse() {
     currentGroundHit.copy(hits[0].point);
     if (state.mode === 'playing' && state.player && !comfyStudio.isOpen) {
       state.player.setMoveTarget(currentGroundHit);
-    } else if (state.mode === 'editor') {
+    }
+    if (state.editorOpen) {
       editorState.previewGroup.position.set(
         THREE.MathUtils.clamp(currentGroundHit.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX),
         0,
@@ -915,7 +920,7 @@ canvasEl.addEventListener('pointerdown', (e) => {
   hasMouseMoved = true;
   updateGroundRaycastFromMouse();
 
-  if (state.mode === 'editor') {
+  if (state.editorOpen) {
     handleEditorCanvasClick(currentGroundHit, e.button === 2);
     return;
   }
@@ -995,10 +1000,8 @@ skillBtnEl.addEventListener('click', () => {
 window.addEventListener('keydown', (e) => {
   if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
 
-  if (state.mode === 'editor') {
-    if (e.key === 'r' || e.key === 'R') {
-      rotateEditorBrush();
-    }
+  if (state.editorOpen && (e.key === 'r' || e.key === 'R')) {
+    rotateEditorBrush();
     return;
   }
 
@@ -1017,8 +1020,8 @@ soundBtnEl.addEventListener('click', () => {
 });
 
 restartBtnEl.addEventListener('click', () => {
-  if (state.mode === 'intro') return;
-  loadStage(state.stageIndex, state.mode === 'editor');
+  modalOverlayEl.classList.add('hidden');
+  loadStage(state.stageIndex, state.editorOpen);
 });
 
 function showModal({ badge, title, desc, buttonText, onAction }) {
@@ -1038,7 +1041,7 @@ function showModal({ badge, title, desc, buttonText, onAction }) {
 modalActionBtn.onclick = () => {
   sfx.init();
   modalOverlayEl.classList.add('hidden');
-  loadStage(0, false);
+  loadStage(state.stageIndex, false);
 };
 
 function updateHud() {
@@ -1046,10 +1049,7 @@ function updateHud() {
   if (!stageData) return;
 
   const aliveOrPending = Math.max(0, state.totalStageEnemies - state.defeatedStageEnemies);
-  waveTextEl.textContent =
-    state.mode === 'editor'
-      ? `에디터 모드 (지형물 ${(stageData.props || []).length}개)`
-      : `웨이브 ${state.waveIndex + 1}/${stageData.waves.length}`;
+  waveTextEl.textContent = `웨이브 ${state.waveIndex + 1}/${stageData.waves.length}`;
   enemyCountTextEl.textContent = `적 ${aliveOrPending}`;
 
   const progressPct =
@@ -1134,36 +1134,21 @@ function gameLoop(now) {
     comfyStudio.renderer.render(comfyStudio.scene, comfyStudio.camera);
   }
 
-  if (state.mode === 'editor' && state.world) {
-    updateGroundRaycastFromMouse();
-
-    cameraFocus.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, 6 * dt));
-    camera.position.lerp(
-      new THREE.Vector3().copy(cameraFocus).add(EDITOR_CAMERA_OFFSET),
-      Math.min(1, 6 * dt)
-    );
-    camera.lookAt(cameraFocus.x, 0, cameraFocus.z);
-
-    state.pads.forEach((p) => p.update(dt, elapsed));
-    for (let i = state.effects.length - 1; i >= 0; i--) {
-      if (state.effects[i].update(dt)) {
-        scene.remove(state.effects[i].mesh);
-        state.effects.splice(i, 1);
-      }
-    }
-    updateHud();
-  } else if (state.mode === 'playing' && state.player && state.world) {
+  if (state.mode === 'playing' && state.player && state.world) {
     updateGroundRaycastFromMouse();
 
     state.player.update(dt, elapsed);
 
-    const targetCamFocus = new THREE.Vector3(
-      THREE.MathUtils.clamp(state.player.position.x, -26, 26),
-      0,
-      THREE.MathUtils.clamp(state.player.position.z, -16, 16)
-    );
+    const camOffset = state.editorOpen ? EDITOR_CAMERA_OFFSET : PLAY_CAMERA_OFFSET;
+    const targetCamFocus = state.editorOpen
+      ? new THREE.Vector3(0, 0, 0)
+      : new THREE.Vector3(
+          THREE.MathUtils.clamp(state.player.position.x, -26, 26),
+          0,
+          THREE.MathUtils.clamp(state.player.position.z, -16, 16)
+        );
     cameraFocus.lerp(targetCamFocus, Math.min(1, 7.5 * dt));
-    camera.position.copy(cameraFocus).add(PLAY_CAMERA_OFFSET);
+    camera.position.copy(cameraFocus).add(camOffset);
     camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
 
     if (state.world.citadel && state.world.citadel.emblem) {

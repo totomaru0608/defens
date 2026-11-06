@@ -1,6 +1,6 @@
-// 기본 5개 스테이지 데이터, 동물형 적(코끼리/하마/기린) 모션 설정 및 스테이지 에디터 저장 모듈
+// 기본 6개 스테이지 데이터, 동물형 적(코끼리/하마/기린) 모션 설정 및 스테이지 에디터 저장 모듈
 
-const STORAGE_KEY = 'coin_defense_stages_v4';
+const STORAGE_KEY = 'coin_defense_stages_v5';
 
 // ComfyUI 동물 모션 스튜디오에서 실시간으로 조절 가능한 동물별 동작 파라미터
 export const ANIMAL_MOTION_CONFIG = {
@@ -80,17 +80,17 @@ export const DEFAULT_STAGES = [
     waves: [
       {
         groups: [
-          { type: 'imp', count: 5, interval: 1.1, delay: 0 },
-          { type: 'giraffe', count: 4, interval: 1.8, delay: 1.5 },
-          { type: 'hippo', count: 3, interval: 2.4, delay: 4.0 },
+          { type: 'imp', count: 5, interval: 1.0, delay: 0 },
+          { type: 'giraffe', count: 4, interval: 1.6, delay: 1.0 },
+          { type: 'hippo', count: 3, interval: 2.2, delay: 3.0 },
         ],
       },
       {
         groups: [
-          { type: 'giraffe', count: 6, interval: 1.4, delay: 0 },
-          { type: 'hippo', count: 4, interval: 2.0, delay: 2.5 },
-          { type: 'elephant', count: 2, interval: 3.5, delay: 5.0 },
-          { type: 'raider', count: 6, interval: 1.2, delay: 6.5 },
+          { type: 'giraffe', count: 6, interval: 1.3, delay: 0 },
+          { type: 'hippo', count: 4, interval: 1.9, delay: 2.0 },
+          { type: 'elephant', count: 2, interval: 3.0, delay: 4.0 },
+          { type: 'raider', count: 5, interval: 1.1, delay: 5.5 },
         ],
       },
     ],
@@ -146,21 +146,21 @@ export const DEFAULT_STAGES = [
       {
         groups: [
           { type: 'giraffe', count: 7, interval: 1.2, delay: 0 },
-          { type: 'hippo', count: 5, interval: 1.9, delay: 2.5 },
+          { type: 'hippo', count: 5, interval: 1.8, delay: 2.0 },
         ],
       },
       {
         groups: [
           { type: 'imp', count: 10, interval: 0.7, delay: 0 },
-          { type: 'hippo', count: 6, interval: 1.8, delay: 2 },
-          { type: 'elephant', count: 3, interval: 3.0, delay: 5 },
+          { type: 'hippo', count: 6, interval: 1.7, delay: 2.0 },
+          { type: 'elephant', count: 3, interval: 2.8, delay: 4.5 },
         ],
       },
       {
         groups: [
           { type: 'giraffe', count: 10, interval: 0.95, delay: 0 },
-          { type: 'elephant', count: 4, interval: 2.8, delay: 3 },
-          { type: 'brute', count: 4, interval: 2.0, delay: 6 },
+          { type: 'elephant', count: 4, interval: 2.6, delay: 2.5 },
+          { type: 'brute', count: 4, interval: 2.0, delay: 5.0 },
         ],
       },
     ],
@@ -214,20 +214,20 @@ export const DEFAULT_STAGES = [
       {
         groups: [
           { type: 'giraffe', count: 10, interval: 0.9, delay: 0 },
-          { type: 'hippo', count: 6, interval: 1.6, delay: 2 },
+          { type: 'hippo', count: 6, interval: 1.6, delay: 2.0 },
         ],
       },
       {
         groups: [
           { type: 'hippo', count: 8, interval: 1.5, delay: 0 },
-          { type: 'elephant', count: 4, interval: 2.6, delay: 3 },
+          { type: 'elephant', count: 4, interval: 2.5, delay: 2.5 },
         ],
       },
       {
         groups: [
           { type: 'giraffe', count: 12, interval: 0.8, delay: 0 },
-          { type: 'elephant', count: 5, interval: 2.4, delay: 2 },
-          { type: 'boss', count: 1, interval: 4.0, delay: 5 },
+          { type: 'elephant', count: 5, interval: 2.3, delay: 2.0 },
+          { type: 'boss', count: 1, interval: 4.0, delay: 4.5 },
         ],
       },
     ],
@@ -281,34 +281,34 @@ export const DEFAULT_STAGES = [
       {
         groups: [
           { type: 'giraffe', count: 12, interval: 0.75, delay: 0 },
-          { type: 'hippo', count: 8, interval: 1.4, delay: 2 },
-          { type: 'elephant', count: 4, interval: 2.4, delay: 4 },
+          { type: 'hippo', count: 8, interval: 1.4, delay: 2.0 },
+          { type: 'elephant', count: 4, interval: 2.3, delay: 3.5 },
         ],
       },
       {
         groups: [
           { type: 'sprinter', count: 14, interval: 0.6, delay: 0 },
-          { type: 'elephant', count: 6, interval: 2.2, delay: 2 },
-          { type: 'hippo', count: 8, interval: 1.3, delay: 5 },
+          { type: 'elephant', count: 6, interval: 2.1, delay: 2.0 },
+          { type: 'hippo', count: 8, interval: 1.3, delay: 4.5 },
         ],
       },
       {
         groups: [
           { type: 'giraffe', count: 14, interval: 0.65, delay: 0 },
-          { type: 'elephant', count: 7, interval: 2.0, delay: 2 },
-          { type: 'boss', count: 1, interval: 4.0, delay: 5 },
+          { type: 'elephant', count: 7, interval: 1.9, delay: 2.0 },
+          { type: 'boss', count: 1, interval: 4.0, delay: 4.5 },
         ],
       },
     ],
   },
   {
     id: 5,
-    name: '왕국 본성 최후의 결전',
-    subtitle: 'STAGE 5 · 야수 군단 총공세와 최후의 성채',
-    startCoins: 125,
-    castleMaxHp: 150,
-    groundColor: 0x52a842,
-    groundAltColor: 0x459436,
+    name: '붉은 협곡의 징검다리',
+    subtitle: 'STAGE 5 · 굽이치는 강줄기와 코끼리 중장갑단',
+    startCoins: 115,
+    castleMaxHp: 145,
+    groundColor: 0x56a83a,
+    groundAltColor: 0x48922f,
     roadColor: 0xedd5a1,
     roadBorderColor: 0xc6a96e,
     pathPoints: [
@@ -354,23 +354,93 @@ export const DEFAULT_STAGES = [
       {
         groups: [
           { type: 'giraffe', count: 14, interval: 0.65, delay: 0 },
-          { type: 'hippo', count: 10, interval: 1.2, delay: 2 },
-          { type: 'elephant', count: 5, interval: 2.2, delay: 4 },
+          { type: 'hippo', count: 10, interval: 1.2, delay: 2.0 },
+          { type: 'elephant', count: 5, interval: 2.1, delay: 4.0 },
         ],
       },
       {
         groups: [
           { type: 'hippo', count: 12, interval: 1.1, delay: 0 },
-          { type: 'elephant', count: 8, interval: 1.9, delay: 2 },
-          { type: 'giraffe', count: 14, interval: 0.65, delay: 5 },
+          { type: 'elephant', count: 8, interval: 1.8, delay: 2.0 },
+          { type: 'giraffe', count: 14, interval: 0.65, delay: 4.5 },
         ],
       },
       {
         groups: [
-          { type: 'elephant', count: 10, interval: 1.7, delay: 0 },
-          { type: 'hippo', count: 12, interval: 1.1, delay: 2 },
-          { type: 'boss', count: 2, interval: 6.0, delay: 5 },
-          { type: 'giraffe', count: 16, interval: 0.55, delay: 7 },
+          { type: 'elephant', count: 9, interval: 1.7, delay: 0 },
+          { type: 'hippo', count: 12, interval: 1.1, delay: 2.0 },
+          { type: 'boss', count: 1, interval: 5.0, delay: 4.5 },
+        ],
+      },
+    ],
+  },
+  {
+    id: 6,
+    name: '황혼의 코끼리 대평원 (최종 결전)',
+    subtitle: 'STAGE 6 · 야수 대군단과 쌍둥이 군단장 결전',
+    startCoins: 135,
+    castleMaxHp: 160,
+    groundColor: 0x65a30d,
+    groundAltColor: 0x4d7c0f,
+    roadColor: 0xfef08a,
+    roadBorderColor: 0xd97706,
+    pathPoints: [
+      [-29, 13],
+      [-18, -14],
+      [-6, 13],
+      [5, -13],
+      [16, 13],
+      [24, -10],
+      [28, 12],
+    ],
+    buildPads: [
+      { x: -23, z: -2, baseCost: 30 },
+      { x: -12, z: -1, baseCost: 30 },
+      { x: -12, z: 8, baseCost: 35 },
+      { x: -1, z: -1, baseCost: 35 },
+      { x: 5, z: 7, baseCost: 35 },
+      { x: 11, z: -2, baseCost: 40 },
+      { x: 20, z: 2, baseCost: 40 },
+      { x: 22, z: 10, baseCost: 45 },
+    ],
+    props: [
+      { type: 'mountain', x: -27, z: -14, scale: 1.55, rot: 0.4 },
+      { type: 'mountain', x: -5, z: -16, scale: 1.45, rot: 1.2 },
+      { type: 'mountain', x: 16, z: -15, scale: 1.5, rot: 2.0 },
+      { type: 'mountain', x: 28, z: -15, scale: 1.45, rot: 0.7 },
+      { type: 'lake', x: -24, z: 14, scale: 1.35, rot: 0.3 },
+      { type: 'lake', x: 4, z: 15, scale: 1.3, rot: -0.5 },
+      { type: 'river', x: -16, z: 12, scale: 1.25, rot: 0.4 },
+      { type: 'river', x: 12, z: -12, scale: 1.25, rot: -0.4 },
+      { type: 'signpost', x: -20, z: 5, scale: 1.2, rot: 0.5 },
+      { type: 'signpost', x: 0, z: 6, scale: 1.2, rot: -0.4 },
+      { type: 'signpost', x: 18, z: -4, scale: 1.2, rot: 0.8 },
+      { type: 'rock', x: -8, z: -12, scale: 1.35, rot: 0.9 },
+      { type: 'rock', x: 26, z: 0, scale: 1.35, rot: 1.7 },
+      { type: 'forest', x: -27, z: 5, scale: 1.25, rot: 0.6 },
+      { type: 'forest', x: 10, z: 15, scale: 1.25, rot: 1.4 },
+    ],
+    waves: [
+      {
+        groups: [
+          { type: 'giraffe', count: 16, interval: 0.6, delay: 0 },
+          { type: 'hippo', count: 12, interval: 1.1, delay: 1.5 },
+          { type: 'elephant', count: 6, interval: 1.9, delay: 3.5 },
+        ],
+      },
+      {
+        groups: [
+          { type: 'hippo', count: 14, interval: 1.0, delay: 0 },
+          { type: 'elephant', count: 9, interval: 1.7, delay: 2.0 },
+          { type: 'giraffe', count: 16, interval: 0.6, delay: 4.0 },
+        ],
+      },
+      {
+        groups: [
+          { type: 'elephant', count: 12, interval: 1.5, delay: 0 },
+          { type: 'hippo', count: 14, interval: 1.0, delay: 2.0 },
+          { type: 'boss', count: 2, interval: 5.5, delay: 4.0 },
+          { type: 'giraffe', count: 18, interval: 0.5, delay: 6.0 },
         ],
       },
     ],
@@ -381,17 +451,114 @@ function cloneDeep(obj) {
   return JSON.parse(JSON.stringify(obj));
 }
 
+// 새 스테이지 추가 시 스테이지 번호마다 고유한 지형 색상·길 경로·지형물·웨이브를 생성
+export function createNewStageTemplate(nextId) {
+  const palettes = [
+    { ground: 0x5cb346, alt: 0x4ea039, road: 0xead29c, border: 0xc5aa72, theme: '푸른 고원' },
+    { ground: 0x65a30d, alt: 0x4d7c0f, road: 0xfef08a, border: 0xd97706, theme: '황금 들녘' },
+    { ground: 0x10b981, alt: 0x059669, road: 0xfde68a, border: 0xb45309, theme: '에메랄드 협곡' },
+    { ground: 0x4ade80, alt: 0x22c55e, road: 0xfed7aa, border: 0xc2410c, theme: '바람의 분지' },
+  ];
+  const pal = palettes[nextId % palettes.length];
+  const sign = nextId % 2 === 0 ? 1 : -1;
+
+  return {
+    id: nextId,
+    name: `${pal.theme} 전장 #${nextId}`,
+    subtitle: `STAGE ${nextId} · 야수 군단 공성전`,
+    startCoins: 85 + nextId * 10,
+    castleMaxHp: 110 + nextId * 15,
+    groundColor: pal.ground,
+    groundAltColor: pal.alt,
+    roadColor: pal.road,
+    roadBorderColor: pal.border,
+    pathPoints: [
+      [-28, -13 * sign],
+      [-17, 12 * sign],
+      [-6, -11 * sign],
+      [5, 12 * sign],
+      [16, -10 * sign],
+      [27, 12 * sign],
+    ],
+    buildPads: [
+      { x: -22, z: 0, baseCost: 30 },
+      { x: -11, z: 2 * sign, baseCost: 30 },
+      { x: -1, z: -2 * sign, baseCost: 35 },
+      { x: 10, z: 2 * sign, baseCost: 35 },
+      { x: 20, z: -1 * sign, baseCost: 40 },
+      { x: 21, z: 7 * sign, baseCost: 40 },
+    ],
+    props: [
+      { type: 'mountain', x: -26, z: 14 * sign, scale: 1.45, rot: 0.4 },
+      { type: 'mountain', x: 25, z: -14 * sign, scale: 1.4, rot: 1.2 },
+      { type: 'lake', x: -16, z: -13 * sign, scale: 1.3, rot: 0.2 },
+      { type: 'river', x: 12, z: 13 * sign, scale: 1.25, rot: 0.5 },
+      { type: 'signpost', x: -12, z: -5 * sign, scale: 1.15, rot: 0.5 },
+      { type: 'signpost', x: 15, z: -3 * sign, scale: 1.15, rot: -0.4 },
+      { type: 'rock', x: -3, z: 14 * sign, scale: 1.3, rot: 0.8 },
+      { type: 'forest', x: 3, z: -14 * sign, scale: 1.25, rot: 0.3 },
+    ],
+    waves: [
+      {
+        groups: [
+          { type: 'giraffe', count: 8 + nextId * 2, interval: 0.8, delay: 0 },
+          { type: 'hippo', count: 5 + nextId, interval: 1.4, delay: 2.0 },
+        ],
+      },
+      {
+        groups: [
+          { type: 'elephant', count: 3 + nextId, interval: 2.0, delay: 0 },
+          { type: 'hippo', count: 6 + nextId, interval: 1.3, delay: 2.0 },
+          { type: 'giraffe', count: 8 + nextId, interval: 0.75, delay: 4.0 },
+        ],
+      },
+      {
+        groups: [
+          { type: 'elephant', count: 4 + nextId, interval: 1.8, delay: 0 },
+          { type: 'boss', count: Math.max(1, Math.floor(nextId / 3)), interval: 5.0, delay: 3.0 },
+        ],
+      },
+    ],
+  };
+}
+
 export function loadStages() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    // 이전 버전(v2, v3, v4) 또는 현재(v5)에 사용자가 추가해둔 스테이지가 있으면 보존 및 마이그레이션
+    const keysToTry = [
+      STORAGE_KEY,
+      'coin_defense_stages_v4',
+      'coin_defense_stages_v3',
+      'coin_defense_stages_v2',
+    ];
+    for (const key of keysToTry) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // 만약 기본 스테이지만 있고 6스테이지 미만이면 기본 6스테이지로 보강
+        while (parsed.length < DEFAULT_STAGES.length) {
+          parsed.push(cloneDeep(DEFAULT_STAGES[parsed.length]));
+        }
         parsed.forEach((st, i) => {
           st.id = i + 1;
-          if (!Array.isArray(st.props)) st.props = [];
-          if (!Array.isArray(st.buildPads)) st.buildPads = [];
+          if (!Array.isArray(st.props) || st.props.length === 0) {
+            st.props = cloneDeep(
+              (DEFAULT_STAGES[i] || createNewStageTemplate(i + 1)).props
+            );
+          }
+          if (!Array.isArray(st.buildPads) || st.buildPads.length === 0) {
+            st.buildPads = cloneDeep(
+              (DEFAULT_STAGES[i] || createNewStageTemplate(i + 1)).buildPads
+            );
+          }
+          if (!Array.isArray(st.waves) || st.waves.length === 0) {
+            st.waves = cloneDeep(
+              (DEFAULT_STAGES[i] || createNewStageTemplate(i + 1)).waves
+            );
+          }
         });
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed));
         return parsed;
       }
     }
@@ -414,61 +581,10 @@ export function saveStages(stagesList) {
 
 export function resetStagesToDefault() {
   localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem('coin_defense_stages_v4');
+  localStorage.removeItem('coin_defense_stages_v3');
+  localStorage.removeItem('coin_defense_stages_v2');
   return cloneDeep(DEFAULT_STAGES);
-}
-
-export function createNewStageTemplate(nextId) {
-  return {
-    id: nextId,
-    name: `새로운 전장 #${nextId}`,
-    subtitle: `STAGE ${nextId} · 사용자 정의 방어전`,
-    startCoins: 80 + nextId * 10,
-    castleMaxHp: 100 + nextId * 15,
-    groundColor: 0x5cb346,
-    groundAltColor: 0x4ea039,
-    roadColor: 0xead29c,
-    roadBorderColor: 0xc5aa72,
-    pathPoints: [
-      [-28, -12],
-      [-15, -10],
-      [-8, 8],
-      [4, 10],
-      [10, -8],
-      [21, -6],
-      [27, 11],
-    ],
-    buildPads: [
-      { x: -16, z: -2, baseCost: 30 },
-      { x: -2, z: 3, baseCost: 35 },
-      { x: 4, z: -3, baseCost: 35 },
-      { x: 16, z: 2, baseCost: 40 },
-    ],
-    props: [
-      { type: 'mountain', x: -26, z: 13, scale: 1.4, rot: 0.4 },
-      { type: 'mountain', x: 25, z: -14, scale: 1.35, rot: 1.2 },
-      { type: 'lake', x: -18, z: 12, scale: 1.2, rot: 0.2 },
-      { type: 'river', x: 14, z: 12, scale: 1.2, rot: 0.5 },
-      { type: 'signpost', x: -11, z: -6, scale: 1.1, rot: 0.5 },
-      { type: 'signpost', x: 18, z: -1, scale: 1.1, rot: -0.4 },
-      { type: 'rock', x: -4, z: -12, scale: 1.25, rot: 0.8 },
-      { type: 'forest', x: 2, z: 15, scale: 1.2, rot: 0.3 },
-    ],
-    waves: [
-      {
-        groups: [
-          { type: 'giraffe', count: 8 + nextId * 2, interval: 0.9, delay: 0 },
-          { type: 'hippo', count: 5 + nextId, interval: 1.5, delay: 3 },
-        ],
-      },
-      {
-        groups: [
-          { type: 'elephant', count: 3 + nextId, interval: 2.2, delay: 0 },
-          { type: 'hippo', count: 6 + nextId, interval: 1.4, delay: 2 },
-          { type: 'boss', count: nextId >= 3 ? 1 : 0, interval: 4.0, delay: 5 },
-        ].filter((g) => g.count > 0),
-      },
-    ],
-  };
 }
 
 export let STAGES = loadStages();
