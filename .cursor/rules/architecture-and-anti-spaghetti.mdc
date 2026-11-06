@@ -1,0 +1,26 @@
+---
+description: 코인 건국 수비대 (Coin Kingdom Defense) 아키텍처, 파일 길이 제한(300줄), 스파게티 코드 방지, 코드 재사용(DRY) 및 CF 무중단 멀티플레이어 규칙
+globs: "**/*"
+alwaysApply: true
+---
+
+# 🛡️ Anti-Spaghetti & Modular Architecture Rules
+
+## 1. 파일 및 함수 크기 절대 상한선 (Strict Size Limits)
+- **파일 길이 상한선**: 모든 `.js` 모듈은 **권장 200줄 이하, 절대 상한 300줄 이하**로 유지한다.
+- **`src/main.js` 상한선**: **최대 250줄 이하** (부트스트랩, 모듈 연결, 메인 루프 호출만 수행).
+- **함수 길이 상한선**: 단일 함수는 **40줄 이하**, 중첩(Nesting)은 **최대 2단계**까지만 허용한다.
+- **선(先) 분리 원칙**: 이미 300줄을 초과한 파일(`main.js`, `kingdomDomain.js`, `entities.js`, `stages.js` 등)을 수정할 때는 **절대 그 파일에 코드를 더 쌓지 말고, 수정할 도메인/UI 기능을 먼저 별도 모듈 파일로 추출(Extract)한 뒤 작업**한다.
+
+## 2. 6계층 폴더 구조 및 책임 분리 (Separation of Concerns)
+- `src/core/`: 엔진 공통 유틸리티 (`eventBus.js`, `liveReloadGuard.js`, `meshFactory.js`) — 도메인 지식 금지.
+- `src/data/`: 순수 데이터 레지스트리 (`kingdomConfig.js`, `stagePresets.js`) — `three` 및 DOM `import` 금지.
+- `src/entities/`: 3D 액터 클래스 (1파일 1클래스 원칙: `PlayerHero.js`, `RedEnemy.js`, `BuildPad.js`, `WildPrey.js` 등).
+- `src/domains/`: 게임 규칙·경제·시뮬레이션 (`kingdomEconomy.js`, `settlementBuilder3D.js`, `combatManager.js`) — `document.*` 직접 조작 금지.
+- `src/ui/`: HUD, 맵·웨이브 에디터, ComfyUI 스튜디오 UI (`hudController.js`, `editorController.js`, `comfyStudioUI.js`) — `eventBus`를 통해서만 도메인과 통신.
+- `src/network/` & `server/`: Cloudflare Workers + Durable Objects (`server/cloudflare-worker.js`) 및 WebSocket 동기화 (`multiplayerClient.js`).
+
+## 3. 코드 재사용(DRY) 및 무중단(Zero-Downtime) 원칙
+- **3D 메쉬/머티리얼 캐시 재사용**: `new THREE.MeshStandardMaterial`이나 기본 도형 생성을 각 파일마다 중복 작성하지 않고 `src/core/meshFactory.js`를 재사용한다.
+- **데이터 주도 확장**: 인과관계 건국 시스템(`사냥 12명 한계 ➔ 집 짓기 ➔ 농사·어업 ➔ 시장 체계화 ➔ 무역소 ➔ 성 ➔ 확장 문명`)과 방어 시설(`감시탑·방어탑·울타리·성벽`)은 하드코딩 분기문 대신 `src/data/kingdomConfig.js` 레지스트리로 관리한다.
+- **무중단 상태 보존**: 모든 도메인 상태 변경은 `getSnapshot()` / `applySnapshot()` 및 `liveReloadGuard.js`와 호환되어야 하며, 게임 플레이 중 업데이트가 일어나도 세션이 초기화되지 않아야 한다.

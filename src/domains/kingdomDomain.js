@@ -966,6 +966,103 @@ export class KingdomDomainManager {
         this.castleUpgradeGroup.add(auraRing);
       }
     }
+
+    // 8. 🌱 무중단 확장으로 추가된 신규 커스텀 시설 3D 렌더링
+    let customIdx = 0;
+    for (const [facId, facDef] of Object.entries(KINGDOM_CONFIG.facilities)) {
+      if (facId === 'house' || facId === 'farm' || facId === 'fishery') continue;
+      const lv = this.getFacilityLevel(facId);
+      if (lv <= 0) continue;
+
+      const angle = customIdx * 1.15 + 0.5;
+      const cx = THREE.MathUtils.clamp(this.villagePos.x + Math.cos(angle) * 6.2, -24, 24);
+      const cz = THREE.MathUtils.clamp(this.villagePos.z + Math.sin(angle) * 5.2, -13, 13);
+
+      const node = new THREE.Group();
+      const base = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.95, 1.15, 1.3 + lv * 0.25, 8),
+        new THREE.MeshStandardMaterial({ color: 0x10b981, flatShading: true })
+      );
+      base.position.y = 0.65 + lv * 0.12;
+      base.castShadow = true;
+      node.add(base);
+
+      const dome = new THREE.Mesh(
+        new THREE.ConeGeometry(1.2, 0.95, 8),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, flatShading: true })
+      );
+      dome.position.y = 1.65 + lv * 0.25;
+      node.add(dome);
+
+      node.position.set(cx, 0, cz);
+      this.customFacilityGroup.add(node);
+      customIdx += 1;
+    }
+  }
+
+  /**
+   * 3D 월드 위에 표시할 정착지·산업 구역 라벨 목록 반환
+   */
+  getDistrictLandmarks() {
+    const effMaxPop = this.getEffectiveMaxPopulation();
+    const houseLv = this.getFacilityLevel('house');
+    const farmLv = this.getFacilityLevel('farm');
+    const fisheryLv = this.getFacilityLevel('fishery');
+    const sysMult = this.getAgriFishMultiplier();
+
+    const list = [
+      {
+        id: 'house',
+        actionType: 'facility',
+        pos: this.villagePos.clone().setY(2.35),
+        label: `⛺ 마을 · 🏠집 Lv.${houseLv} (👥${this.population}/${effMaxPop}명)`,
+        sub: this.isRelyingOnlyOnHunting() ? '🏹 사냥만으론 최대 12명 한계' : `🏠 클릭 시 집 증축 (+4명)`,
+        highlight: this.population >= effMaxPop,
+      },
+      {
+        id: 'farm',
+        actionType: 'facility',
+        pos: this.farmPos.clone().setY(2.45),
+        label: farmLv > 0 ? `🌾 농경지 Lv.${farmLv} (+${(farmLv * 5.5 * sysMult).toFixed(1)}🍖/s)` : `🌾 농사 개간지 (미개간)`,
+        sub: farmLv > 0 ? `풍차 가동 중 (체계화 x${sysMult})` : `클릭해 농사 시작 (12명 한계 돌파!)`,
+        highlight: this.isRelyingOnlyOnHunting() && this.population >= 10,
+      },
+      {
+        id: 'fishery',
+        actionType: 'facility',
+        pos: this.fisheryPos.clone().setY(2.25),
+        label:
+          fisheryLv > 0
+            ? `🐟 어업 부두 Lv.${fisheryLv} (+${(fisheryLv * 6.5 * sysMult).toFixed(1)}🍖/s)`
+            : `🐟 강·호수 어장 (미개척)`,
+        sub: fisheryLv > 0 ? `고기잡이 어선 조업 중 (x${sysMult})` : `클릭해 물고기 잡기 시작!`,
+        highlight: this.isRelyingOnlyOnHunting() && this.population >= 10,
+      },
+    ];
+
+    if (this.settlementStep >= 3) {
+      list.push({
+        id: 'market',
+        actionType: 'settlement',
+        pos: this.marketPos.clone().setY(2.4),
+        label: `🏪 타운 시장 (농·어업 체계화 x${sysMult})`,
+        sub: `주기별 세금 +🪙${this.getTaxPerCycle()} 창출 중`,
+        highlight: false,
+      });
+    }
+
+    if (this.settlementStep >= 4) {
+      list.push({
+        id: 'trading_post',
+        actionType: 'settlement',
+        pos: this.tradePostPos.clone().setY(2.7),
+        label: `⚖️ 대무역소 (교역 마차 운행)`,
+        sub: `광역 무역 관세 확보 중`,
+        highlight: false,
+      });
+    }
+
+    return list;
   }
 
   /**

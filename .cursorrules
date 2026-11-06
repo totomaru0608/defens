@@ -1,0 +1,79 @@
+# 🛡️ 코인 건국 수비대 (Coin Kingdom Defense) — Cursor Engineering Rules (.cursorrules)
+# 목적: 스파게티 코드 원천 차단 · 파일 길이 엄격 제한 · 코드 재사용(DRY) 극대화 · CF 멀티플레이어 무중단(Zero-Downtime) 유지보수
+
+---
+
+## 1. 📏 파일 및 함수 길이 하드 리밋 (Strict Size Limits — 스파게티 코드 방지 최우선 규칙)
+
+1. **단일 파일 최대 줄 수 제한 (Hard Limit: 300줄)**
+   - **경고 기준 (Soft Limit)**: `200줄` — 파일이 200줄을 넘어가면 책임이 섞이고 있는지 즉시 점검한다.
+   - **절대 상한선 (Hard Limit)**: **`300줄`** — 어떠한 소스 파일(`.js`)도 300줄을 초과할 수 없다. (순수 정적 데이터 배열 파일만 예외적으로 400줄 허용)
+   - 기존 파일에 기능을 추가할 때 파일 길이가 300줄을 넘을 것 같으면, **절대 그 파일에 코드를 덧붙이지 말고 먼저 하위 모듈로 분리(Extract Module)한 뒤 작업**한다.
+2. **엔트리 파일(`src/main.js`) 최대 줄 수 제한 (Max: 250줄)**
+   - `src/main.js`는 오직 **앱 초기화(Bootstrap), 모듈 조립(Wiring), 메인 `requestAnimationFrame` 루프 호출**만 담당한다.
+   - `src/main.js` 내부에 UI 모달 생성 로직, 에디터 DOM 조작, 3D 메쉬 생성, 상세 전투 수식을 직접 작성하는 것을 **엄격히 금지**한다.
+3. **단일 함수 길이 및 복잡도 제한**
+   - **함수 1개당 최대 `40줄` 이내**로 작성한다.
+   - 조건문 중첩(Nesting Depth)은 **최대 `2단계`**까지만 허용하며, Early Return(`if (!valid) return;`) 패턴을 의무 적용한다.
+   - `if / else if`가 3개 이상 이어지는 분기문은 금지하며, 반드시 `src/data/`의 **데이터 레지스트리(Lookup Table / Map)**로 대체한다.
+
+---
+
+## 2. 🏛️ 6계층 도메인 분리 아키텍처 (Strict 6-Layer Architecture & 단방향 의존성)
+
+모든 코드는 아래 6개 계층 중 하나에 속해야 하며, **1파일 1책임(1 File = 1 Class or 1 Cohesive Feature)** 원칙을 따른다:
+
+```
+src/
+ ├── core/        # [계층 1] 순수 코어 유틸리티 (eventBus, liveReloadGuard, meshFactory, domHelper)
+ ├── data/        # [계층 2] 순수 설정·밸런스·월드 레지스트리 (kingdomConfig, stageData, enemyDefs)
+ ├── entities/    # [계층 3] 재사용 가능한 3D 액터 (PlayerHero, RedEnemy, BuildPad, WildPrey, Companion)
+ ├── domains/     # [계층 4] 게임 비즈니스·시뮬레이션 도메인 (kingdomEconomy, settlement3D, combatSystem)
+ ├── network/     # [계층 5] CF Workers / WebSocket / BroadcastChannel 실시간 동기화 (multiplayerClient)
+ └── ui/          # [계층 6] HUD · 맵/웨이브 에디터 · ComfyUI 스튜디오 UI 컨트롤러 (hudUI, editorUI, comfyUI)
+server/
+ ├── cloudflare-worker.js  # Cloudflare Workers + Durable Objects (KingdomRoomDO)
+ └── index.js              # 로컬 개발 및 Node.js 호환 WebSocket 룸 서버
+```
+
+### 🔒 계층 간 침범 금지 규칙 (Boundary Rules)
+1. **`domains/`와 `entities/`에서 DOM(`document.*`, `window.*`) 직접 접근 절대 금지**:
+   - 3D 도메인과 엔티티는 화면 UI가 어떻게 생겼는지 전혀 몰라야 한다.
+   - UI 갱신이 필요하면 `eventBus.emit('kingdom:updated', snapshot)`으로 이벤트만 발행하고, `src/ui/` 컨트롤러가 이를 구독해 DOM을 갱신한다.
+2. **`ui/`에서 Three.js 3D 씬 객체 직접 변형 금지**:
+   - UI 버튼 클릭 시 3D 메쉬를 직접 수정하지 않고, 도메인 메서드나 `eventBus.emit('ui:build_facility', { id })`를 호출한다.
+3. **`data/`는 100% 순수 데이터(Plain Object)와 등록 함수만 포함**:
+   - `src/data/` 내부에서는 `three`나 DOM, `network`를 절대 `import`하지 않는다.
+
+---
+
+## 3. ♻️ 코드 재사용(DRY) 및 메모리 최적화 규칙
+
+1. **3D 도형·머티리얼 팩토리 재사용 의무화 (`src/core/meshFactory.js`)**
+   - 여러 파일에서 `new THREE.Mesh(new THREE.BoxGeometry(...), new THREE.MeshStandardMaterial(...))`를 반복 작성하는 것을 금지한다.
+   - 반드시 공통 머티리얼 캐시(`getStandardMat(colorHex, opts)`)와 도형 빌더(`createBox`, `createCylinder`, `createCone`, `createRing`, `disposeGroup(group)`)를 재사용하여 **코드 길이를 60% 이상 단축하고 GPU 메모리 누수를 방지**한다.
+2. **엔티티 공통 베이스 클래스 / 컴포넌트 재사용**
+   - 체력(`hp/maxHp`), 이동(`position/velocity`), 파괴(`destroy()`) 로직을 가진 객체(`PlayerHero`, `RedEnemy`, `WildPrey`, `CompanionUnit`, `RemotePlayerAvatar`)는 공통 헬퍼나 베이스 메서드를 공유하여 중복 코드를 작성하지 않는다.
+3. **DOM 제어 헬퍼 재사용**
+   - 반복적인 `document.createElement`, 클래스 토글, 입력 바인딩은 `src/ui/` 전용 유틸 함수로 공통화한다.
+
+---
+
+## 4. ⚡ 무중단 업데이트(Zero-Downtime) & Cloudflare(CF) 멀티플레이어 규칙
+
+1. **새 콘텐츠(문명 단계·건물·방어탑·적) 추가 시 코드 수정 대신 데이터 등록 우선**
+   - 예: `작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성` 이후 새로운 단계나 `집(🏠) · 농사(🌾) · 어업(🐟)` 외 신규 산업을 추가할 때, 기존 루프 코드를 뜯어고치지 않고 `KINGDOM_CONFIG` 레지스트리(`registerSettlementStage`, `registerKingdomFacility`, `registerFortificationType`)에 데이터를 추가한다.
+2. **런타임 상태 보존 (`liveReloadGuard.js`) 필수 연동**
+   - 새로운 성장 상태(예: 신규 건물 레벨, 신규 자원)를 추가할 때는 반드시 `getSnapshot()`과 `applySnapshot(snap)`에 직렬화 필드를 포함시켜, **게임 플레이 도중 업데이트나 리로드가 발생해도 유저의 진행 상태가 100% 유지**되도록 한다.
+3. **네트워크 패킷 하위 호환성 유지 (`server/` & `src/network/`)**
+   - Cloudflare Durable Objects(`KingdomRoomDO`) 및 WebSocket 패킷에 새 필드를 추가할 때는 항상 Optional Chaining과 기본값(`packet.field ?? defaultValue`)을 사용하여, 구버전 클라이언트와 신버전 클라이언트가 같은 방에 있어도 에러가 나지 않게 한다.
+
+---
+
+## 5. ✅ AI 에이전트 작업 전·후 자가 검증 체크리스트 (Mandatory Pre/Post-Check)
+
+코드를 생성하거나 수정할 때 AI는 반드시 다음 4가지를 확인한다:
+- [ ] **줄 수 검사**: 수정하려는 파일이 `300줄`을 넘는가? 넘거나 넘을 예정이면 작업 전에 파일을 먼저 기능별로 쪼갰는가?
+- [ ] **중복 검사**: 똑같은 `THREE.Mesh` 생성 코드나 DOM 생성 코드를 복사·붙여넣기 하지 않았는가?
+- [ ] **무중단 검사**: 플레이 도중 코드가 반영되어도 `liveReloadGuard`를 통해 진행 중인 웨이브·세금·마을이 초기화되지 않는가?
+- [ ] **빌드 검증**: 수정 후 `npm run build`가 경고/에러 없이 통과하는가?
