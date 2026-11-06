@@ -16,11 +16,12 @@ export function makeLowPolyMaterial(color, opts = {}) {
     metalness: opts.metalness ?? 0.08,
     emissive: opts.emissive ?? 0x000000,
     emissiveIntensity: opts.emissiveIntensity ?? 0,
+    side: opts.side ?? THREE.FrontSide,
   });
 }
 
-// 구불구불한 모래길 리본 지오메트리 생성
-function createRibbonGeometry(curve, halfWidth, yOffset = 0.04, segments = 150) {
+// 구불구불한 모래길 리본 지오메트리 생성 (+Y 법선 방향 보장)
+function createRibbonGeometry(curve, halfWidth, yOffset = 0.06, segments = 180) {
   const points = curve.getPoints(segments);
   const positions = [];
   const indices = [];
@@ -42,8 +43,9 @@ function createRibbonGeometry(curve, halfWidth, yOffset = 0.04, segments = 150) 
 
     if (i < points.length - 1) {
       const base = i * 2;
-      indices.push(base, base + 1, base + 2);
-      indices.push(base + 1, base + 3, base + 2);
+      // 위쪽(+Y)을 향하는 반시계방향(CCW) 삼각형 인덱스
+      indices.push(base, base + 2, base + 1);
+      indices.push(base + 1, base + 2, base + 3);
     }
   }
 
@@ -55,11 +57,12 @@ function createRibbonGeometry(curve, halfWidth, yOffset = 0.04, segments = 150) 
   return geo;
 }
 
-// 작은 성채 (왕국 수호 대상) 생성
+// 작은 성채 (왕국 수호 대상) 생성 - 시야를 가리지 않는 아담한 비율
 function createSmallCitadel(position, lookTarget) {
   const group = new THREE.Group();
   group.position.copy(position);
   group.lookAt(lookTarget.x, position.y, lookTarget.z);
+  group.scale.set(0.76, 0.76, 0.76);
 
   const stoneMat = makeLowPolyMaterial(0xdbe4ee);
   const darkStoneMat = makeLowPolyMaterial(0x94a3b8);
@@ -68,71 +71,71 @@ function createSmallCitadel(position, lookTarget) {
   const gateMat = makeLowPolyMaterial(0x451a03);
 
   // 성채 본체(Keep)
-  const keep = new THREE.Mesh(new THREE.BoxGeometry(5.6, 3.8, 5.2), stoneMat);
-  keep.position.y = 1.9;
+  const keep = new THREE.Mesh(new THREE.BoxGeometry(5.2, 3.4, 4.8), stoneMat);
+  keep.position.y = 1.7;
   keep.castShadow = true;
   keep.receiveShadow = true;
   group.add(keep);
 
   // 성채 상단 흉벽(Battlements)
-  for (let ix = -2.4; ix <= 2.4; ix += 1.2) {
-    for (const iz of [-2.4, 2.4]) {
-      const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.55, 0.55), darkStoneMat);
-      merlon.position.set(ix, 4.05, iz);
+  for (let ix = -2.2; ix <= 2.2; ix += 1.1) {
+    for (const iz of [-2.2, 2.2]) {
+      const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.5), darkStoneMat);
+      merlon.position.set(ix, 3.65, iz);
       merlon.castShadow = true;
       group.add(merlon);
     }
   }
 
   // 중앙 첨탑과 파란 지붕
-  const spireBase = new THREE.Mesh(new THREE.BoxGeometry(2.8, 1.8, 2.8), stoneMat);
-  spireBase.position.y = 4.5;
+  const spireBase = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 2.5), stoneMat);
+  spireBase.position.y = 4.0;
   spireBase.castShadow = true;
   group.add(spireBase);
 
-  const mainRoof = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2.4, 4), roofMat);
-  mainRoof.position.y = 6.6;
+  const mainRoof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 2.0, 4), roofMat);
+  mainRoof.position.y = 5.75;
   mainRoof.rotation.y = Math.PI / 4;
   mainRoof.castShadow = true;
   group.add(mainRoof);
 
   // 지붕 위 황금 코인 엠블럼
-  const emblem = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.65, 0.22, 10), goldMat);
+  const emblem = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.2, 10), goldMat);
   emblem.rotation.z = Math.PI / 2;
-  emblem.position.y = 8.1;
+  emblem.position.y = 7.05;
   group.add(emblem);
 
   // 4개의 모서리 원형 포탑
   const corners = [
-    [-2.7, -2.5],
-    [2.7, -2.5],
-    [-2.7, 2.5],
-    [2.7, 2.5],
+    [-2.5, -2.3],
+    [2.5, -2.3],
+    [-2.5, 2.3],
+    [2.5, 2.3],
   ];
   corners.forEach(([cx, cz]) => {
-    const tower = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.2, 4.6, 8), stoneMat);
-    tower.position.set(cx, 2.3, cz);
+    const tower = new THREE.Mesh(new THREE.CylinderGeometry(0.95, 1.1, 4.0, 8), stoneMat);
+    tower.position.set(cx, 2.0, cz);
     tower.castShadow = true;
     tower.receiveShadow = true;
     group.add(tower);
 
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.22, 1.22, 0.45, 8), darkStoneMat);
-    ring.position.set(cx, 4.6, cz);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.12, 1.12, 0.4, 8), darkStoneMat);
+    ring.position.set(cx, 4.0, cz);
     group.add(ring);
 
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(1.4, 1.8, 8), roofMat);
-    cone.position.set(cx, 5.7, cz);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(1.28, 1.5, 8), roofMat);
+    cone.position.set(cx, 4.95, cz);
     cone.castShadow = true;
     group.add(cone);
   });
 
   // 전면 성문 아치
-  const gateFrame = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.6, 0.9), darkStoneMat);
-  gateFrame.position.set(0, 1.3, 2.45);
+  const gateFrame = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.4, 0.8), darkStoneMat);
+  gateFrame.position.set(0, 1.2, 2.25);
   group.add(gateFrame);
 
-  const gateDoor = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.2, 0.98), gateMat);
-  gateDoor.position.set(0, 1.1, 2.48);
+  const gateDoor = new THREE.Mesh(new THREE.BoxGeometry(1.65, 2.0, 0.88), gateMat);
+  gateDoor.position.set(0, 1.0, 2.28);
   group.add(gateDoor);
 
   return { group, emblem };
@@ -150,36 +153,36 @@ function createCastleWallSegment(x1, z1, x2, z2, withWatchtower = true) {
   const dist = start.distanceTo(end);
   const mid = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
-  const wall = new THREE.Mesh(new THREE.BoxGeometry(1.3, 2.4, dist), stoneMat);
+  const wall = new THREE.Mesh(new THREE.BoxGeometry(1.15, 2.0, dist), stoneMat);
   wall.position.copy(mid);
-  wall.position.y = 1.2;
-  wall.lookAt(end.x, 1.2, end.z);
+  wall.position.y = 1.0;
+  wall.lookAt(end.x, 1.0, end.z);
   wall.castShadow = true;
   wall.receiveShadow = true;
   group.add(wall);
 
   // 성벽 상단 요철(흉벽)
-  const count = Math.max(2, Math.floor(dist / 1.6));
+  const count = Math.max(2, Math.floor(dist / 1.7));
   for (let i = 0; i <= count; i++) {
     const t = i / count;
     const pos = new THREE.Vector3().lerpVectors(start, end, t);
-    const tooth = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.45, 0.65), trimMat);
-    tooth.position.set(pos.x, 2.6, pos.z);
-    tooth.lookAt(end.x, 2.6, end.z);
+    const tooth = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.38, 0.58), trimMat);
+    tooth.position.set(pos.x, 2.18, pos.z);
+    tooth.lookAt(end.x, 2.18, end.z);
     tooth.castShadow = true;
     group.add(tooth);
   }
 
   if (withWatchtower) {
     [start, end].forEach((pt) => {
-      const bastion = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.35, 3.4, 7), stoneMat);
-      bastion.position.set(pt.x, 1.7, pt.z);
+      const bastion = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.2, 2.9, 7), stoneMat);
+      bastion.position.set(pt.x, 1.45, pt.z);
       bastion.castShadow = true;
       bastion.receiveShadow = true;
       group.add(bastion);
 
-      const cap = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.5, 7), roofMat);
-      cap.position.set(pt.x, 4.1, pt.z);
+      const cap = new THREE.Mesh(new THREE.ConeGeometry(1.32, 1.3, 7), roofMat);
+      cap.position.set(pt.x, 3.5, pt.z);
       cap.castShadow = true;
       group.add(cap);
     });
@@ -198,25 +201,26 @@ function createEnemySpawnGate(position, lookTarget) {
   const crimsonMat = makeLowPolyMaterial(0xdc2626, {
     emissive: 0x7f1d1d,
     emissiveIntensity: 0.45,
+    side: THREE.DoubleSide,
   });
 
-  const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 4.2, 6), darkRockMat);
-  leftPillar.position.set(-2.1, 2.1, 0);
+  const leftPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 1.0, 3.8, 6), darkRockMat);
+  leftPillar.position.set(-1.9, 1.9, 0);
   leftPillar.castShadow = true;
   group.add(leftPillar);
 
-  const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.1, 4.2, 6), darkRockMat);
-  rightPillar.position.set(2.1, 2.1, 0);
+  const rightPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 1.0, 3.8, 6), darkRockMat);
+  rightPillar.position.set(1.9, 1.9, 0);
   rightPillar.castShadow = true;
   group.add(rightPillar);
 
-  const arch = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.9, 1.2), darkRockMat);
-  arch.position.set(0, 4.1, 0);
+  const arch = new THREE.Mesh(new THREE.BoxGeometry(4.8, 0.85, 1.1), darkRockMat);
+  arch.position.set(0, 3.7, 0);
   arch.castShadow = true;
   group.add(arch);
 
-  const portal = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 3.5), crimsonMat);
-  portal.position.set(0, 1.8, 0.05);
+  const portal = new THREE.Mesh(new THREE.PlaneGeometry(3.1, 3.2), crimsonMat);
+  portal.position.set(0, 1.65, 0.05);
   group.add(portal);
 
   return group;
@@ -229,18 +233,18 @@ function createLowPolyTree(scale = 1) {
   const leafMat1 = makeLowPolyMaterial(0x22c55e);
   const leafMat2 = makeLowPolyMaterial(0x16a34a);
 
-  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * scale, 0.35 * scale, 1.2 * scale, 6), trunkMat);
-  trunk.position.y = 0.6 * scale;
+  const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22 * scale, 0.35 * scale, 1.1 * scale, 6), trunkMat);
+  trunk.position.y = 0.55 * scale;
   trunk.castShadow = true;
   group.add(trunk);
 
-  const cone1 = new THREE.Mesh(new THREE.ConeGeometry(1.25 * scale, 1.8 * scale, 7), leafMat1);
-  cone1.position.y = 1.75 * scale;
+  const cone1 = new THREE.Mesh(new THREE.ConeGeometry(1.15 * scale, 1.65 * scale, 7), leafMat1);
+  cone1.position.y = 1.6 * scale;
   cone1.castShadow = true;
   group.add(cone1);
 
-  const cone2 = new THREE.Mesh(new THREE.ConeGeometry(0.95 * scale, 1.5 * scale, 7), leafMat2);
-  cone2.position.y = 2.65 * scale;
+  const cone2 = new THREE.Mesh(new THREE.ConeGeometry(0.88 * scale, 1.35 * scale, 7), leafMat2);
+  cone2.position.y = 2.4 * scale;
   cone2.castShadow = true;
   group.add(cone2);
 
@@ -249,9 +253,9 @@ function createLowPolyTree(scale = 1) {
 
 function createLowPolyRock(scale = 1) {
   const mat = makeLowPolyMaterial(0x94a3b8);
-  const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.75 * scale, 0), mat);
-  mesh.position.y = 0.35 * scale;
-  mesh.scale.set(1.2, 0.75, 1.0);
+  const mesh = new THREE.Mesh(new THREE.DodecahedronGeometry(0.7 * scale, 0), mat);
+  mesh.position.y = 0.32 * scale;
+  mesh.scale.set(1.2, 0.72, 1.0);
   mesh.rotation.set(Math.random(), Math.random() * Math.PI, 0);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -263,10 +267,9 @@ export function buildStageWorld(scene, stageData) {
   scene.add(worldGroup);
 
   // 1. 초록색 들판 지형 (로우폴리 타일 패치 + 레이캐스트용 지면)
-  const groundGeo = new THREE.PlaneGeometry(92, 64, 28, 20);
+  const groundGeo = new THREE.PlaneGeometry(108, 76, 32, 22);
   groundGeo.rotateX(-Math.PI / 2);
 
-  // 가장자리만 살짝 솟아오르게 하고 내부 플레이 구역은 평탄하게 유지
   const posAttr = groundGeo.attributes.position;
   const colors = [];
   const baseCol = new THREE.Color(stageData.groundColor);
@@ -275,8 +278,8 @@ export function buildStageWorld(scene, stageData) {
   for (let i = 0; i < posAttr.count; i++) {
     const x = posAttr.getX(i);
     const z = posAttr.getZ(i);
-    if (Math.abs(x) > 35 || Math.abs(z) > 22) {
-      posAttr.setY(i, 0.45 * Math.sin(x * 0.3) * Math.cos(z * 0.3) + 0.35);
+    if (Math.abs(x) > 36 || Math.abs(z) > 22) {
+      posAttr.setY(i, 0.4 * Math.sin(x * 0.25) * Math.cos(z * 0.25) + 0.3);
     }
     const checker = (Math.floor(x / 4) + Math.floor(z / 4)) % 2 === 0;
     const c = checker ? baseCol : altCol;
@@ -297,7 +300,7 @@ export function buildStageWorld(scene, stageData) {
 
   // 정확한 마우스 레이캐스팅을 위한 평면 지면
   const raycastPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(120, 90).rotateX(-Math.PI / 2),
+    new THREE.PlaneGeometry(140, 100).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ visible: false })
   );
   worldGroup.add(raycastPlane);
@@ -307,28 +310,34 @@ export function buildStageWorld(scene, stageData) {
   const roadCurve = new THREE.CatmullRomCurve3(curvePoints, false, 'catmullrom', 0.38);
 
   // 길 테두리 (돌 경계석 느낌)
-  const borderGeo = createRibbonGeometry(roadCurve, 2.75, 0.03, 160);
-  const borderMesh = new THREE.Mesh(borderGeo, makeLowPolyMaterial(stageData.roadBorderColor));
+  const borderGeo = createRibbonGeometry(roadCurve, 2.85, 0.04, 180);
+  const borderMesh = new THREE.Mesh(
+    borderGeo,
+    makeLowPolyMaterial(stageData.roadBorderColor, { side: THREE.DoubleSide })
+  );
   borderMesh.receiveShadow = true;
   worldGroup.add(borderMesh);
 
-  // 밝은 모래색 본 길
-  const roadGeo = createRibbonGeometry(roadCurve, 2.25, 0.06, 160);
-  const roadMesh = new THREE.Mesh(roadGeo, makeLowPolyMaterial(stageData.roadColor));
+  // 밝은 모래색 본 길 (어느 각도에서나 선명하게 보이도록 DoubleSide + 높이 0.08)
+  const roadGeo = createRibbonGeometry(roadCurve, 2.35, 0.08, 180);
+  const roadMesh = new THREE.Mesh(
+    roadGeo,
+    makeLowPolyMaterial(stageData.roadColor, { side: THREE.DoubleSide, roughness: 0.85 })
+  );
   roadMesh.receiveShadow = true;
   worldGroup.add(roadMesh);
 
   // 길 가장자리 조약돌 장식
   const pebbleMat = makeLowPolyMaterial(0xd6c08d);
-  for (let i = 4; i < 145; i += 5) {
+  for (let i = 4; i < 145; i += 6) {
     const t = i / 150;
     const pt = roadCurve.getPoint(t);
     const tan = roadCurve.getTangent(t);
     const norm = new THREE.Vector3(-tan.z, 0, tan.x).normalize();
     const side = i % 2 === 0 ? 1 : -1;
     const pebble = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.14, 0.32), pebbleMat);
-    pebble.position.copy(pt).addScaledVector(norm, side * (2.42 + (i % 3) * 0.08));
-    pebble.position.y = 0.08;
+    pebble.position.copy(pt).addScaledVector(norm, side * (2.55 + (i % 3) * 0.08));
+    pebble.position.y = 0.09;
     pebble.rotation.y = Math.atan2(tan.x, tan.z);
     pebble.receiveShadow = true;
     worldGroup.add(pebble);
@@ -343,18 +352,21 @@ export function buildStageWorld(scene, stageData) {
   const spawnGate = createEnemySpawnGate(startPt, secondPt);
   worldGroup.add(spawnGate);
 
-  const citadel = createSmallCitadel(endPt, prevEndPt);
+  // 성채를 길 끝 지점에서 살짝 뒤쪽으로 배치해 플레이어 이동과 시야를 가리지 않게 함
+  const endDir = new THREE.Vector3().subVectors(endPt, prevEndPt).normalize();
+  const citadelPos = endPt.clone().addScaledVector(endDir, 2.2);
+  const citadel = createSmallCitadel(citadelPos, prevEndPt);
   worldGroup.add(citadel.group);
 
-  // 주변 성벽과 작은 망루 (북측/남측/측면 방어 성벽)
+  // 주변 성벽과 작은 망루 (맵 외곽 경계를 따라 깔끔하게 배치)
   const wallSegments = [
-    [-33, -20, -12, -20, true],
-    [-4, -20, 16, -20, true],
-    [22, -20, 33, -20, true],
-    [-33, 20, -10, 20, true],
-    [-2, 20, 18, 20, true],
-    [-34, -19, -34, -6, false],
-    [34, -19, 34, 4, true],
+    [-34, -21, -12, -21, true],
+    [-4, -21, 16, -21, true],
+    [22, -21, 34, -21, true],
+    [-34, 21, -10, 21, true],
+    [-2, 21, 18, 21, true],
+    [-35, -20, -35, -6, false],
+    [35, -20, 35, 4, true],
   ];
   wallSegments.forEach(([x1, z1, x2, z2, hasTower]) => {
     worldGroup.add(createCastleWallSegment(x1, z1, x2, z2, hasTower));
@@ -362,37 +374,36 @@ export function buildStageWorld(scene, stageData) {
 
   // 4. 나무, 바위, 꽃덤불을 길과 건설 구역을 피해 절차적 배치
   const sampledRoad = roadCurve.getPoints(90);
-  const isNearRoadOrPad = (x, z, minRoadDist = 4.2) => {
+  const isNearRoadOrPad = (x, z, minRoadDist = 4.4) => {
     for (const rp of sampledRoad) {
       if (Math.hypot(rp.x - x, rp.z - z) < minRoadDist) return true;
     }
     for (const pad of stageData.buildPads) {
-      if (Math.hypot(pad.x - x, pad.z - z) < 3.6) return true;
+      if (Math.hypot(pad.x - x, pad.z - z) < 3.8) return true;
     }
-    if (Math.hypot(endPt.x - x, endPt.z - z) < 6.5) return true;
+    if (Math.hypot(citadelPos.x - x, citadelPos.z - z) < 7.0) return true;
     if (Math.hypot(startPt.x - x, startPt.z - z) < 5.5) return true;
     return false;
   };
 
-  // 의사 난수 생성기 (스테이지마다 일정한 배치)
   let seed = stageData.id * 1337;
   const rand = () => {
     seed = (seed * 16807) % 2147483647;
     return (seed - 1) / 2147483646;
   };
 
-  for (let i = 0; i < 65; i++) {
+  for (let i = 0; i < 60; i++) {
     const x = (rand() - 0.5) * 66;
     const z = (rand() - 0.5) * 38;
-    if (isNearRoadOrPad(x, z, 4.3)) continue;
+    if (isNearRoadOrPad(x, z, 4.4)) continue;
 
     if (rand() < 0.72) {
-      const tree = createLowPolyTree(0.8 + rand() * 0.55);
+      const tree = createLowPolyTree(0.75 + rand() * 0.45);
       tree.position.set(x, 0, z);
       worldGroup.add(tree);
     } else {
-      const rock = createLowPolyRock(0.7 + rand() * 0.65);
-      rock.position.set(x, 0.25, z);
+      const rock = createLowPolyRock(0.65 + rand() * 0.55);
+      rock.position.set(x, 0.22, z);
       worldGroup.add(rock);
     }
   }
@@ -406,4 +417,3 @@ export function buildStageWorld(scene, stageData) {
     startPt,
   };
 }
-

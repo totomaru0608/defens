@@ -50,11 +50,11 @@ renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7dd3fc);
-scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0085);
+scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0065);
 
-// 위에서 비스듬히 내려다보는 아이소메트릭 시점 카메라 설정
-const camera = new THREE.PerspectiveCamera(38, 16 / 9, 0.5, 160);
-const CAMERA_OFFSET = new THREE.Vector3(0, 26, 22);
+// 위에서 비스듬히 내려다보는 아이소메트릭 시점 카메라 (전장이 넓고 시원하게 보이도록 조정)
+const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.5, 180);
+const CAMERA_OFFSET = new THREE.Vector3(0, 32, 24);
 const cameraFocus = new THREE.Vector3(0, 0, 0);
 
 // 조명 구성 (화사하고 선명한 캐주얼 로우폴리 분위기)
@@ -62,13 +62,13 @@ const hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x3f6212, 0.95);
 scene.add(hemiLight);
 
 const dirLight = new THREE.DirectionalLight(0xfff7ed, 1.45);
-dirLight.position.set(22, 38, 24);
+dirLight.position.set(22, 42, 26);
 dirLight.castShadow = true;
 dirLight.shadow.mapSize.width = 2048;
 dirLight.shadow.mapSize.height = 2048;
 dirLight.shadow.camera.near = 5;
-dirLight.shadow.camera.far = 110;
-const d = 38;
+dirLight.shadow.camera.far = 120;
+const d = 40;
 dirLight.shadow.camera.left = -d;
 dirLight.shadow.camera.right = d;
 dirLight.shadow.camera.top = d;
@@ -107,8 +107,9 @@ const state = {
 // 반응형 리사이즈 처리 (16:9 뷰포트 기준)
 function handleResize() {
   const rect = viewportEl.getBoundingClientRect();
-  const width = Math.max(320, rect.width);
-  const height = Math.max(180, rect.height);
+  const width = Math.max(320, Math.round(rect.width));
+  const height = Math.max(180, Math.round(rect.height));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(width, height, false);
   camera.aspect = width / height;
   camera.updateProjectionMatrix();
@@ -120,7 +121,7 @@ handleResize();
 
 // 중앙 알림 배너 표시
 let bannerTimeout = null;
-function showBanner(subtitle, title, duration = 2200) {
+function showBanner(subtitle, title, duration = 2000) {
   bannerSubEl.textContent = subtitle;
   bannerTitleEl.textContent = title;
   centerBannerEl.classList.remove('hidden');
@@ -152,7 +153,7 @@ function spawnFloatingText(worldPos, text, color = '#fef08a') {
   el.style.top = `${screen.y}px`;
   el.style.color = color;
   worldLabelsEl.appendChild(el);
-  setTimeout(() => el.remove(), 850);
+  setTimeout(() => el.remove(), 800);
 }
 
 // 3D 원형 충격파/베기 시각 이펙트 생성
@@ -267,7 +268,7 @@ function loadStage(stageIndex) {
   state.player = new PlayerHero(scene, 0, 0);
   cameraFocus.copy(state.player.position);
   camera.position.copy(cameraFocus).add(CAMERA_OFFSET);
-  camera.lookAt(cameraFocus.x, 0.5, cameraFocus.z);
+  camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
 
   // 건설 구역 및 각 건설 구역 위 코인 비용 배지 생성
   stageData.buildPads.forEach((padData, idx) => {
@@ -284,7 +285,7 @@ function loadStage(stageIndex) {
   prepareWave(0);
   state.mode = 'playing';
 
-  stageBadgeEl.textContent = `STAGE ${stageData.id} / ${STAGES.length}`;
+  stageBadgeEl.textContent = `STAGE ${stageData.id}/${STAGES.length}`;
   stageTitleEl.textContent = stageData.name;
   updateHud();
   showBanner(stageData.subtitle, `${stageData.name} 방어 시작!`);
@@ -312,7 +313,7 @@ function prepareWave(waveIdx) {
   state.spawnQueue.sort((a, b) => a.spawnTime - b.spawnTime);
 
   if (waveIdx > 0) {
-    showBanner(`STAGE ${stageData.id}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1800);
+    showBanner(`STAGE ${stageData.id}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1600);
   }
 }
 
@@ -326,8 +327,8 @@ function updatePlayerTargetFromMouse() {
   }
 }
 
-// 마우스 이벤트 바인딩
-canvasEl.addEventListener('pointermove', (e) => {
+// 마우스 이벤트 바인딩 (뷰포트 전체에서 부드럽게 추적)
+viewportEl.addEventListener('pointermove', (e) => {
   const rect = canvasEl.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -426,7 +427,7 @@ window.addEventListener('keydown', (e) => {
 
 soundBtnEl.addEventListener('click', () => {
   const on = sfx.toggle();
-  soundBtnEl.textContent = on ? '🔊 효과음 ON' : '🔇 효과음 OFF';
+  soundBtnEl.textContent = on ? '🔊' : '🔇';
 });
 
 restartBtnEl.addEventListener('click', () => {
@@ -460,8 +461,8 @@ modalActionBtn.onclick = () => {
 function updateHud() {
   const stageData = STAGES[state.stageIndex];
   const aliveOrPending = Math.max(0, state.totalStageEnemies - state.defeatedStageEnemies);
-  waveTextEl.textContent = `웨이브 ${state.waveIndex + 1} / ${stageData.waves.length}`;
-  enemyCountTextEl.textContent = `남은 적: ${aliveOrPending}명`;
+  waveTextEl.textContent = `웨이브 ${state.waveIndex + 1}/${stageData.waves.length}`;
+  enemyCountTextEl.textContent = `적 ${aliveOrPending}`;
 
   const progressPct =
     state.totalStageEnemies > 0
@@ -470,20 +471,20 @@ function updateHud() {
   waveProgressFillEl.style.width = `${progressPct}%`;
 
   // 성채 HP
-  castleHpTextEl.textContent = `${Math.max(0, Math.ceil(state.castleHp))} / ${state.castleMaxHp}`;
+  castleHpTextEl.textContent = `${Math.max(0, Math.ceil(state.castleHp))}/${state.castleMaxHp}`;
   castleHpFillEl.style.width = `${Math.max(0, (state.castleHp / state.castleMaxHp) * 100)}%`;
 
   // 플레이어 HP
   if (state.player) {
-    playerHpTextEl.textContent = `${Math.max(0, Math.ceil(state.player.hp))} / ${state.player.maxHp}`;
+    playerHpTextEl.textContent = `${Math.max(0, Math.ceil(state.player.hp))}/${state.player.maxHp}`;
     playerHpFillEl.style.width = `${Math.max(0, (state.player.hp / state.player.maxHp) * 100)}%`;
 
     if (state.player.skillTimer > 0) {
       skillBtnEl.classList.add('cooldown');
-      skillStatusEl.textContent = `재충전 ${state.player.skillTimer.toFixed(1)}초`;
+      skillStatusEl.textContent = `충격파 ${state.player.skillTimer.toFixed(1)}s`;
     } else {
       skillBtnEl.classList.remove('cooldown');
-      skillStatusEl.textContent = '준비 완료! (클릭/Space)';
+      skillStatusEl.textContent = '황금 충격파';
     }
   }
 
@@ -495,7 +496,7 @@ function updateHud() {
     const labelEl = state.padLabels[idx];
     if (!labelEl) return;
 
-    const anchor = pad.position.clone().setY(pad.level === 0 ? 2.15 : 3.25 + pad.level * 0.35);
+    const anchor = pad.position.clone().setY(pad.level === 0 ? 2.05 : 3.1 + pad.level * 0.35);
     const screen = worldToScreen(anchor);
     if (!screen.visible) {
       labelEl.style.display = 'none';
@@ -514,7 +515,7 @@ function updateHud() {
       const remaining = Math.max(0, targetCost - pad.investedCoins);
       labelEl.classList.toggle('can-afford', state.coins >= remaining);
       labelEl.classList.remove('maxed');
-      labelEl.innerHTML = `<span class="pad-coin-icon">🪙</span><span>${remaining}</span><small style="opacity:0.85">${selectedDef.emoji} 건설</small>`;
+      labelEl.innerHTML = `<span class="pad-coin-icon">🪙</span><span>${remaining}</span><small style="opacity:0.85">${selectedDef.emoji}</small>`;
     } else if (pad.level < pad.maxLevel) {
       const towerDef = TOWER_TYPES[pad.towerType];
       const targetCost = pad.getCurrentTargetCost(pad.towerType);
@@ -526,7 +527,7 @@ function updateHud() {
       const towerDef = TOWER_TYPES[pad.towerType];
       labelEl.classList.remove('can-afford');
       labelEl.classList.add('maxed');
-      labelEl.innerHTML = `<span>${towerDef.emoji} Lv.MAX</span>`;
+      labelEl.innerHTML = `<span>${towerDef.emoji} MAX</span>`;
     }
   });
 }
@@ -548,15 +549,15 @@ function gameLoop(now) {
     // 1. 플레이어 이동 업데이트
     state.player.update(dt, elapsed);
 
-    // 2. 아이소메트릭 카메라가 플레이어를 부드럽게 추적 (화면 중심 부근 유지)
+    // 2. 아이소메트릭 카메라가 플레이어를 부드럽게 추적 (플레이어를 항상 화면 중심 부근에 유지)
     const targetCamFocus = new THREE.Vector3(
-      THREE.MathUtils.clamp(state.player.position.x, -20, 20),
+      THREE.MathUtils.clamp(state.player.position.x, -26, 26),
       0,
-      THREE.MathUtils.clamp(state.player.position.z, -10, 11)
+      THREE.MathUtils.clamp(state.player.position.z, -16, 16)
     );
-    cameraFocus.lerp(targetCamFocus, Math.min(1, 6.5 * dt));
+    cameraFocus.lerp(targetCamFocus, Math.min(1, 7.5 * dt));
     camera.position.copy(cameraFocus).add(CAMERA_OFFSET);
-    camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z - 1.2);
+    camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
 
     // 성채 황금 코인 엠블럼 회전
     if (state.world.citadel && state.world.citadel.emblem) {
@@ -850,4 +851,3 @@ loadStage(0);
 state.mode = 'intro';
 modalOverlayEl.classList.remove('hidden');
 requestAnimationFrame(gameLoop);
-

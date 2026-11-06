@@ -21,42 +21,41 @@
         <!-- 3D 월드 좌표와 동기화되는 건설 구역 코인 표시 & 플로팅 텍스트 레이어 -->
         <div id="world-labels"></div>
 
-        <!-- 상단/하단 HUD -->
+        <!-- 시야를 가리지 않는 슬림형 상단/하단 HUD -->
         <div id="hud">
           <div class="hud-top">
-            <!-- 좌측: 타이틀 & 스테이지 정보 -->
+            <!-- 좌측: 타이틀 & 스테이지 & 웨이브 (컴팩트 한 줄/두 줄) -->
             <div class="hud-panel stage-panel">
-              <div class="game-brand">
+              <div class="stage-top-row">
                 <span class="brand-badge">🛡️ 코인 수비대</span>
-                <span id="stage-badge" class="stage-tag">STAGE 1 / 3</span>
+                <span id="stage-badge" class="stage-tag">STAGE 1/3</span>
+                <span id="stage-title" class="stage-name">초록 들판의 관문</span>
               </div>
-              <div id="stage-title" class="stage-name">초록 들판의 관문</div>
               <div class="wave-progress-wrap">
-                <div class="wave-label-row">
-                  <span id="wave-text">웨이브 1 / 2</span>
-                  <span id="enemy-count-text">남은 적: 0</span>
-                </div>
+                <span id="wave-text">웨이브 1/2</span>
                 <div class="progress-track">
                   <div id="wave-progress-fill" class="progress-fill"></div>
                 </div>
+                <span id="enemy-count-text">남은 적 0</span>
               </div>
             </div>
 
-            <!-- 중앙: 성채 & 플레이어 체력 -->
+            <!-- 중앙: 성채 & 수비대장 체력 (나란히 1줄 배치로 상하 공간 절약) -->
             <div class="hud-panel vitals-panel">
-              <div class="vital-row">
+              <div class="vital-item">
                 <div class="vital-label">
-                  <span>🏰 왕국 작은 성채</span>
-                  <span id="castle-hp-text">100 / 100</span>
+                  <span>🏰 성채</span>
+                  <span id="castle-hp-text">100/100</span>
                 </div>
                 <div class="hp-bar-outer castle-bar">
                   <div id="castle-hp-fill" class="hp-bar-inner"></div>
                 </div>
               </div>
-              <div class="vital-row">
+              <div class="vital-divider"></div>
+              <div class="vital-item">
                 <div class="vital-label">
-                  <span>⚔️ 수비대장 체력</span>
-                  <span id="player-hp-text">120 / 120</span>
+                  <span>⚔️ 대장</span>
+                  <span id="player-hp-text">120/120</span>
                 </div>
                 <div class="hp-bar-outer player-bar">
                   <div id="player-hp-fill" class="hp-bar-inner"></div>
@@ -64,19 +63,14 @@
               </div>
             </div>
 
-            <!-- 우측: 보유 코인 & 유틸 버튼 -->
-            <div class="hud-right-group">
+            <!-- 우측: 보유 코인 & 유틸 버튼 (한 줄 가로 배치) -->
+            <div class="hud-right-row">
               <div id="coin-hud" class="hud-panel coin-panel">
-                <div class="coin-icon-3d">🪙</div>
-                <div class="coin-info">
-                  <span class="coin-caption">보유 코인</span>
-                  <span id="coin-count">50</span>
-                </div>
+                <span class="coin-icon-3d">🪙</span>
+                <span id="coin-count">70</span>
               </div>
-              <div class="hud-actions">
-                <button id="btn-sound" class="hud-btn" title="효과음 켜기/끄기">🔊 효과음 ON</button>
-                <button id="btn-restart" class="hud-btn" title="현재 스테이지 다시 시작">🔄 재도전</button>
-              </div>
+              <button id="btn-sound" class="hud-btn" title="효과음 켜기/끄기">🔊</button>
+              <button id="btn-restart" class="hud-btn" title="현재 스테이지 다시 시작">🔄</button>
             </div>
           </div>
 
@@ -86,50 +80,30 @@
             <div id="banner-title" class="banner-main">전투 시작!</div>
           </div>
 
-          <!-- 하단: 건설 탑 선택 & 액션 스킬 & 조작 안내 -->
+          <!-- 하단: 슬림 1줄 방어탑 & 스킬 도크 -->
           <div class="hud-bottom">
-            <div class="tower-selector-bar">
-              <div class="selector-label">설치할 방어탑 종류 (숫자키 1~3 또는 클릭):</div>
-              <div class="tower-cards">
-                <button class="tower-card active" data-tower="crossbow">
-                  <span class="key-hint">1</span>
-                  <span class="tower-emoji">🏹</span>
-                  <div class="tower-meta">
-                    <strong>연사 석궁탑</strong>
-                    <span>기본 🪙30 · 빠른 단일 사격</span>
-                  </div>
-                </button>
-                <button class="tower-card" data-tower="cannon">
-                  <span class="key-hint">2</span>
-                  <span class="tower-emoji">💣</span>
-                  <div class="tower-meta">
-                    <strong>화염 대포탑</strong>
-                    <span>기본 🪙45 · 광역 폭발 피해</span>
-                  </div>
-                </button>
-                <button class="tower-card" data-tower="frost">
-                  <span class="key-hint">3</span>
-                  <span class="tower-emoji">❄️</span>
-                  <div class="tower-meta">
-                    <strong>빙결 수정탑</strong>
-                    <span>기본 🪙40 · 적 이동속도 감속</span>
-                  </div>
-                </button>
-                <button id="btn-skill" class="skill-card" title="마우스 좌클릭 또는 Space 키로 발동">
-                  <span class="key-hint">클릭 / Space</span>
-                  <span class="tower-emoji">⚡</span>
-                  <div class="tower-meta">
-                    <strong>황금 충격파 베기</strong>
-                    <span id="skill-status">준비 완료!</span>
-                  </div>
-                </button>
-              </div>
-            </div>
-
-            <div class="control-guide">
-              <span>🖱️ <strong>마우스 포인터 이동</strong>: 지면 목표 지점으로 가속/감속 이동</span>
-              <span>⚔️ <strong>근접 시 자동 공격</strong> · <strong>좌클릭/Space</strong>: 황금 충격파</span>
-              <span>🪙 <strong>건설 구역 위에 서기</strong>: 코인을 소모해 방어탑 설치 및 강화(최대 Lv.3)</span>
+            <div class="tower-dock">
+              <button class="tower-card active" data-tower="crossbow" title="숫자키 1: 빠른 단일 사격 석궁탑">
+                <span class="key-hint">1</span>
+                <span class="tower-emoji">🏹</span>
+                <span class="tower-label">석궁탑 <small>🪙30</small></span>
+              </button>
+              <button class="tower-card" data-tower="cannon" title="숫자키 2: 광역 폭발 화염 포탑">
+                <span class="key-hint">2</span>
+                <span class="tower-emoji">💣</span>
+                <span class="tower-label">화염탑 <small>🪙45</small></span>
+              </button>
+              <button class="tower-card" data-tower="frost" title="숫자키 3: 적 이동속도 감속 수정탑">
+                <span class="key-hint">3</span>
+                <span class="tower-emoji">❄️</span>
+                <span class="tower-label">빙결탑 <small>🪙40</small></span>
+              </button>
+              <div class="dock-sep"></div>
+              <button id="btn-skill" class="skill-card" title="마우스 좌클릭 또는 Space 키로 발동">
+                <span class="key-hint">클릭/Space</span>
+                <span class="tower-emoji">⚡</span>
+                <span id="skill-status" class="tower-label">황금 충격파</span>
+              </button>
             </div>
           </div>
         </div>
@@ -147,22 +121,22 @@
               <div class="feature-item">
                 <span class="f-icon">🖱️</span>
                 <div>
-                  <strong>마우스 레이캐스팅 이동</strong>
-                  <small>포인터 지면 좌표를 향해 가속/감속하며 부드럽게 이동</small>
+                  <strong>마우스 지면 이동</strong>
+                  <small>포인터 지면 좌표를 향해 가속/감속 이동</small>
                 </div>
               </div>
               <div class="feature-item">
                 <span class="f-icon">🪙</span>
                 <div>
-                  <strong>코인 수집 &amp; 방어탑 건설</strong>
-                  <small>적 처치 코인으로 건설 구역 위에서 탑 설치 및 강화</small>
+                  <strong>코인 방어탑 건설</strong>
+                  <small>건설 구역 위에서 코인으로 탑 설치·강화</small>
                 </div>
               </div>
               <div class="feature-item">
                 <span class="f-icon">🏰</span>
                 <div>
-                  <strong>3개 스테이지 연속 정복</strong>
-                  <small>초록 들판 → 쌍둥이 협곡 성벽 → 붉은 군단장 결전</small>
+                  <strong>3개 스테이지 정복</strong>
+                  <small>초록 들판 → 성벽 굽잇길 → 본성 결전</small>
                 </div>
               </div>
             </div>
@@ -175,4 +149,3 @@
     <script type="module" src="./src/main.js"></script>
   </body>
 </html>
-
