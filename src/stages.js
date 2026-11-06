@@ -1,19 +1,21 @@
-// 총 3개 스테이지 구성 데이터 (길 경로, 건설 구역 좌표, 웨이브 구성, 성채/스폰 위치)
-export const STAGES = [
+// 기본 스테이지 데이터 및 사용자 커스텀 스테이지(에디터) 저장/불러오기 모듈
+
+const STORAGE_KEY = 'coin_defense_stages_v2';
+
+export const DEFAULT_STAGES = [
   {
     id: 1,
     name: '초록 들판의 관문',
-    subtitle: 'STAGE 1 · 평원 가도 방어전',
-    startCoins: 70,
+    subtitle: 'STAGE 1 · 호수와 이정표가 있는 평원 가도',
+    startCoins: 75,
     castleMaxHp: 100,
     groundColor: 0x62b644,
     groundAltColor: 0x56a63a,
     roadColor: 0xe9cf96,
     roadBorderColor: 0xc8ad73,
-    // 구불구불한 모래길 컨트롤 포인트 (북서쪽 적 진영 -> 남동쪽 작은 성채)
     pathPoints: [
-      [-28, -16],
-      [-18, -14],
+      [-28, -15],
+      [-18, -13],
       [-10, -4],
       [-14, 7],
       [-3, 12],
@@ -23,7 +25,6 @@ export const STAGES = [
       [23, 3],
       [27, 13],
     ],
-    // 길 주변 지정 건설 구역 (x, z, 기본 비용 배율)
     buildPads: [
       { x: -16, z: -7, baseCost: 30 },
       { x: -6, z: 3, baseCost: 30 },
@@ -31,6 +32,23 @@ export const STAGES = [
       { x: 1, z: 5, baseCost: 35 },
       { x: 13, z: -2, baseCost: 35 },
       { x: 16, z: 7, baseCost: 40 },
+    ],
+    // 다채로운 기본 지형물 배치 (산, 호수, 강, 이정표, 바위, 숲)
+    props: [
+      { type: 'mountain', x: -27, z: 14, scale: 1.35, rot: 0.3 },
+      { type: 'mountain', x: 26, z: -15, scale: 1.45, rot: 1.1 },
+      { type: 'mountain', x: -2, z: -16, scale: 1.15, rot: 2.2 },
+      { type: 'lake', x: -24, z: 2, scale: 1.25, rot: 0.4 },
+      { type: 'lake', x: 17, z: -15, scale: 1.1, rot: -0.5 },
+      { type: 'river', x: -2, z: -4, scale: 1.2, rot: 0.45 },
+      { type: 'signpost', x: -13, z: -10, scale: 1.1, rot: 0.6 },
+      { type: 'signpost', x: 3, z: 9, scale: 1.1, rot: -0.4 },
+      { type: 'signpost', x: 21, z: 7, scale: 1.1, rot: -0.8 },
+      { type: 'rock', x: -8, z: -13, scale: 1.2, rot: 0.9 },
+      { type: 'rock', x: 12, z: 12, scale: 1.3, rot: 1.7 },
+      { type: 'forest', x: -23, z: -4, scale: 1.15, rot: 0.2 },
+      { type: 'forest', x: 9, z: 13, scale: 1.2, rot: 1.4 },
+      { type: 'forest', x: 25, z: -5, scale: 1.1, rot: 0.8 },
     ],
     waves: [
       {
@@ -50,9 +68,9 @@ export const STAGES = [
   },
   {
     id: 2,
-    name: '옛 성벽의 굽잇길',
-    subtitle: 'STAGE 2 · 구불구불한 요새 가도',
-    startCoins: 85,
+    name: '옛 성벽과 푸른 강 협곡',
+    subtitle: 'STAGE 2 · 설산과 강줄기가 흐르는 요새 가도',
+    startCoins: 90,
     castleMaxHp: 120,
     groundColor: 0x58b048,
     groundAltColor: 0x4b9d3d,
@@ -78,6 +96,22 @@ export const STAGES = [
       { x: 5, z: -6, baseCost: 35 },
       { x: 17, z: -3, baseCost: 40 },
       { x: 18, z: 7, baseCost: 40 },
+    ],
+    props: [
+      { type: 'mountain', x: -27, z: -14, scale: 1.5, rot: 0.5 },
+      { type: 'mountain', x: 3, z: -16, scale: 1.3, rot: 1.8 },
+      { type: 'mountain', x: 27, z: -15, scale: 1.4, rot: 0.9 },
+      { type: 'river', x: -10, z: 14, scale: 1.35, rot: 1.4 },
+      { type: 'river', x: 16, z: 12, scale: 1.25, rot: -0.3 },
+      { type: 'lake', x: -25, z: -5, scale: 1.3, rot: 0.2 },
+      { type: 'lake', x: 3, z: 15, scale: 1.15, rot: 0.7 },
+      { type: 'signpost', x: -19, z: 8, scale: 1.15, rot: 0.3 },
+      { type: 'signpost', x: -1, z: 6, scale: 1.1, rot: -0.5 },
+      { type: 'signpost', x: 22, z: -4, scale: 1.1, rot: 0.9 },
+      { type: 'rock', x: -13, z: 14, scale: 1.3, rot: 0.4 },
+      { type: 'rock', x: 19, z: -15, scale: 1.25, rot: 2.1 },
+      { type: 'forest', x: -26, z: 5, scale: 1.2, rot: 0.6 },
+      { type: 'forest', x: 28, z: -3, scale: 1.2, rot: 1.1 },
     ],
     waves: [
       {
@@ -105,8 +139,8 @@ export const STAGES = [
   {
     id: 3,
     name: '왕국 본성 최후의 결전',
-    subtitle: 'STAGE 3 · 붉은 군단장 토벌전',
-    startCoins: 105,
+    subtitle: 'STAGE 3 · 쌍둥이 호수와 설산 요새 결전',
+    startCoins: 110,
     castleMaxHp: 140,
     groundColor: 0x52a842,
     groundAltColor: 0x459436,
@@ -134,6 +168,23 @@ export const STAGES = [
       { x: 11, z: -5, baseCost: 40 },
       { x: 22, z: 2, baseCost: 45 },
     ],
+    props: [
+      { type: 'mountain', x: -28, z: 16, scale: 1.5, rot: 0.2 },
+      { type: 'mountain', x: -18, z: -15, scale: 1.35, rot: 1.4 },
+      { type: 'mountain', x: 9, z: -16, scale: 1.45, rot: 0.8 },
+      { type: 'mountain', x: 27, z: -15, scale: 1.4, rot: 2.3 },
+      { type: 'lake', x: -4, z: 15, scale: 1.25, rot: 0.3 },
+      { type: 'lake', x: 22, z: -14, scale: 1.2, rot: -0.4 },
+      { type: 'river', x: -16, z: -12, scale: 1.2, rot: 0.5 },
+      { type: 'river', x: 10, z: -12, scale: 1.25, rot: -0.6 },
+      { type: 'signpost', x: -25, z: -9, scale: 1.15, rot: 0.4 },
+      { type: 'signpost', x: -6, z: 0, scale: 1.15, rot: -0.3 },
+      { type: 'signpost', x: 19, z: -2, scale: 1.15, rot: 0.7 },
+      { type: 'rock', x: -28, z: 3, scale: 1.3, rot: 1.0 },
+      { type: 'rock', x: 9, z: 15, scale: 1.25, rot: 0.5 },
+      { type: 'forest', x: -16, z: 15, scale: 1.2, rot: 0.9 },
+      { type: 'forest', x: 26, z: 2, scale: 1.15, rot: 1.6 },
+    ],
     waves: [
       {
         groups: [
@@ -160,6 +211,116 @@ export const STAGES = [
     ],
   },
 ];
+
+function cloneDeep(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+export function loadStages() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        parsed.forEach((st, i) => {
+          st.id = i + 1;
+          if (!Array.isArray(st.props)) st.props = [];
+          if (!Array.isArray(st.buildPads)) st.buildPads = [];
+        });
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn('저장된 스테이지 로드 실패, 기본값을 사용합니다.', e);
+  }
+  return cloneDeep(DEFAULT_STAGES);
+}
+
+export function saveStages(stagesList) {
+  stagesList.forEach((st, i) => {
+    st.id = i + 1;
+  });
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stagesList));
+  } catch (e) {
+    console.warn('스테이지 저장 실패:', e);
+  }
+}
+
+export function resetStagesToDefault() {
+  localStorage.removeItem(STORAGE_KEY);
+  return cloneDeep(DEFAULT_STAGES);
+}
+
+export function createNewStageTemplate(nextId) {
+  return {
+    id: nextId,
+    name: `새로운 전장 #${nextId}`,
+    subtitle: `STAGE ${nextId} · 사용자 정의 방어전`,
+    startCoins: 80 + nextId * 10,
+    castleMaxHp: 100 + nextId * 15,
+    groundColor: 0x5cb346,
+    groundAltColor: 0x4ea039,
+    roadColor: 0xead29c,
+    roadBorderColor: 0xc5aa72,
+    pathPoints: [
+      [-28, -12],
+      [-15, -10],
+      [-8, 8],
+      [4, 10],
+      [10, -8],
+      [21, -6],
+      [27, 11],
+    ],
+    buildPads: [
+      { x: -16, z: -2, baseCost: 30 },
+      { x: -2, z: 3, baseCost: 35 },
+      { x: 4, z: -3, baseCost: 35 },
+      { x: 16, z: 2, baseCost: 40 },
+    ],
+    props: [
+      { type: 'mountain', x: -26, z: 13, scale: 1.4, rot: 0.4 },
+      { type: 'mountain', x: 25, z: -14, scale: 1.35, rot: 1.2 },
+      { type: 'lake', x: -18, z: 12, scale: 1.2, rot: 0.2 },
+      { type: 'river', x: 14, z: 12, scale: 1.2, rot: 0.5 },
+      { type: 'signpost', x: -11, z: -6, scale: 1.1, rot: 0.5 },
+      { type: 'signpost', x: 18, z: -1, scale: 1.1, rot: -0.4 },
+      { type: 'rock', x: -4, z: -12, scale: 1.25, rot: 0.8 },
+      { type: 'forest', x: 2, z: 15, scale: 1.2, rot: 0.3 },
+    ],
+    waves: [
+      {
+        groups: [
+          { type: 'imp', count: 10 + nextId * 2, interval: 0.8, delay: 0 },
+          { type: 'raider', count: 8 + nextId * 2, interval: 1.0, delay: 3 },
+        ],
+      },
+      {
+        groups: [
+          { type: 'sprinter', count: 8 + nextId * 2, interval: 0.75, delay: 0 },
+          { type: 'brute', count: 3 + nextId, interval: 2.0, delay: 2 },
+          { type: 'boss', count: nextId >= 3 ? 1 : 0, interval: 4.0, delay: 5 },
+        ].filter((g) => g.count > 0),
+      },
+    ],
+  };
+}
+
+export let STAGES = loadStages();
+
+export function setStagesList(newList) {
+  STAGES = newList;
+  saveStages(STAGES);
+}
+
+export const PROP_CATALOG = {
+  forest: { name: '숲/나무', emoji: '🌲' },
+  rock: { name: '바위군', emoji: '🪨' },
+  lake: { name: '호수', emoji: '💧' },
+  river: { name: '강줄기', emoji: '🌊' },
+  mountain: { name: '설산', emoji: '⛰️' },
+  signpost: { name: '이정표', emoji: '🪧' },
+};
 
 export const TOWER_TYPES = {
   crossbow: {
@@ -258,4 +419,3 @@ export const ENEMY_TYPES = {
     isBoss: true,
   },
 };
-

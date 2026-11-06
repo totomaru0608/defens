@@ -24,24 +24,23 @@
         <!-- 시야를 가리지 않는 슬림형 상단/하단 HUD -->
         <div id="hud">
           <div class="hud-top">
-            <!-- 좌측: 타이틀 & 스테이지 & 웨이브 (컴팩트 한 줄/두 줄) -->
+            <!-- 좌측: 타이틀 & 스테이지 선택 & 웨이브 -->
             <div class="hud-panel stage-panel">
               <div class="stage-top-row">
                 <span class="brand-badge">🛡️ 코인 수비대</span>
-                <span id="stage-badge" class="stage-tag">STAGE 1/3</span>
-                <span id="stage-title" class="stage-name">초록 들판의 관문</span>
+                <select id="stage-select" class="stage-select" title="스테이지 선택"></select>
               </div>
               <div class="wave-progress-wrap">
                 <span id="wave-text">웨이브 1/2</span>
                 <div class="progress-track">
                   <div id="wave-progress-fill" class="progress-fill"></div>
                 </div>
-                <span id="enemy-count-text">남은 적 0</span>
+                <span id="enemy-count-text">적 0</span>
               </div>
             </div>
 
-            <!-- 중앙: 성채 & 수비대장 체력 (나란히 1줄 배치로 상하 공간 절약) -->
-            <div class="hud-panel vitals-panel">
+            <!-- 중앙: 성채 & 수비대장 체력 (나란히 1줄 배치) -->
+            <div id="vitals-hud" class="hud-panel vitals-panel">
               <div class="vital-item">
                 <div class="vital-label">
                   <span>🏰 성채</span>
@@ -63,14 +62,39 @@
               </div>
             </div>
 
-            <!-- 우측: 보유 코인 & 유틸 버튼 (한 줄 가로 배치) -->
+            <!-- 우측: 보유 코인 & 에디터/유틸 버튼 -->
             <div class="hud-right-row">
               <div id="coin-hud" class="hud-panel coin-panel">
                 <span class="coin-icon-3d">🪙</span>
-                <span id="coin-count">70</span>
+                <span id="coin-count">75</span>
               </div>
+              <button id="btn-editor" class="hud-btn editor-toggle-btn" title="스테이지 및 지형물 에디터 열기/닫기">
+                🛠️ 에디터
+              </button>
               <button id="btn-sound" class="hud-btn" title="효과음 켜기/끄기">🔊</button>
               <button id="btn-restart" class="hud-btn" title="현재 스테이지 다시 시작">🔄</button>
+            </div>
+          </div>
+
+          <!-- 스테이지 & 지형 에디터 상단 서브 바 (에디터 모드에서만 표시) -->
+          <div id="editor-topbar" class="editor-topbar hidden">
+            <div class="editor-stage-controls">
+              <label class="ed-field">
+                <span>이름</span>
+                <input id="ed-stage-name" type="text" maxlength="22" placeholder="스테이지 이름" />
+              </label>
+              <label class="ed-field">
+                <span>시작🪙</span>
+                <input id="ed-start-coins" type="number" min="30" max="999" step="5" />
+              </label>
+              <label class="ed-field">
+                <span>성채HP</span>
+                <input id="ed-castle-hp" type="number" min="50" max="999" step="10" />
+              </label>
+              <button id="btn-ed-add-stage" class="ed-btn add" title="새 스테이지 추가">+ 스테이지 추가</button>
+              <button id="btn-ed-del-stage" class="ed-btn danger" title="현재 스테이지 삭제">🗑️ 스테이지 삭제</button>
+              <button id="btn-ed-reset-all" class="ed-btn" title="기본 스테이지 및 지형물로 초기화">↺ 기본값 복원</button>
+              <button id="btn-ed-play" class="ed-btn play" title="에디터를 닫고 현재 스테이지 플레이">▶️ 플레이 시작</button>
             </div>
           </div>
 
@@ -80,9 +104,10 @@
             <div id="banner-title" class="banner-main">전투 시작!</div>
           </div>
 
-          <!-- 하단: 슬림 1줄 방어탑 & 스킬 도크 -->
+          <!-- 하단 영역: 플레이 중에는 방어탑 도크 / 에디터 모드에서는 지형물 브러시 도크 -->
           <div class="hud-bottom">
-            <div class="tower-dock">
+            <!-- 전투 모드 하단 도크 -->
+            <div id="combat-dock" class="tower-dock">
               <button class="tower-card active" data-tower="crossbow" title="숫자키 1: 빠른 단일 사격 석궁탑">
                 <span class="key-hint">1</span>
                 <span class="tower-emoji">🏹</span>
@@ -105,6 +130,39 @@
                 <span id="skill-status" class="tower-label">황금 충격파</span>
               </button>
             </div>
+
+            <!-- 에디터 모드 하단 지형물 브러시 도크 -->
+            <div id="editor-dock" class="tower-dock editor-brush-dock hidden">
+              <button class="brush-btn active" data-brush="forest" title="숲/나무 군락 배치">
+                <span>🌲 숲</span>
+              </button>
+              <button class="brush-btn" data-brush="rock" title="바위 군락 배치">
+                <span>🪨 바위</span>
+              </button>
+              <button class="brush-btn" data-brush="lake" title="푸른 호수 배치">
+                <span>💧 호수</span>
+              </button>
+              <button class="brush-btn" data-brush="river" title="강줄기 & 나무 다리 배치">
+                <span>🌊 강</span>
+              </button>
+              <button class="brush-btn" data-brush="mountain" title="만년설 산봉우리 배치">
+                <span>⛰️ 산</span>
+              </button>
+              <button class="brush-btn" data-brush="signpost" title="나무 이정표 배치">
+                <span>🪧 이정표</span>
+              </button>
+              <button class="brush-btn" data-brush="pad" title="타워 건설 구역(패드) 추가">
+                <span>🪙 건설구역</span>
+              </button>
+              <div class="dock-sep"></div>
+              <button class="brush-btn erase-btn" data-brush="erase" title="클릭한 지형물 또는 건설구역 삭제 (우클릭도 즉시 삭제)">
+                <span>🧹 클릭삭제</span>
+              </button>
+              <div class="dock-sep"></div>
+              <button id="btn-ed-scale" class="ed-mini-btn" title="배치할 지형물 크기 변경">크기: 1.2x</button>
+              <button id="btn-ed-rotate" class="ed-mini-btn" title="배치할 지형물 회전 (단축키 R)">↻ 회전(R)</button>
+              <button id="btn-ed-clear-props" class="ed-mini-btn danger" title="현재 스테이지의 모든 지형물 비우기">지형물 비우기</button>
+            </div>
           </div>
         </div>
 
@@ -126,17 +184,17 @@
                 </div>
               </div>
               <div class="feature-item">
-                <span class="f-icon">🪙</span>
+                <span class="f-icon">⛰️</span>
                 <div>
-                  <strong>코인 방어탑 건설</strong>
-                  <small>건설 구역 위에서 코인으로 탑 설치·강화</small>
+                  <strong>다채로운 지형 &amp; 에디터</strong>
+                  <small>산·호수·강·바위·숲·이정표 및 스테이지 편집</small>
                 </div>
               </div>
               <div class="feature-item">
                 <span class="f-icon">🏰</span>
                 <div>
-                  <strong>3개 스테이지 정복</strong>
-                  <small>초록 들판 → 성벽 굽잇길 → 본성 결전</small>
+                  <strong>스테이지 연속 정복</strong>
+                  <small>기본 3개 스테이지 + 자유로운 스테이지 추가</small>
                 </div>
               </div>
             </div>

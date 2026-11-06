@@ -1,6 +1,14 @@
 import * as THREE from 'three';
-import { STAGES, TOWER_TYPES } from './stages.js';
-import { buildStageWorld } from './world.js';
+import {
+  STAGES,
+  TOWER_TYPES,
+  PROP_CATALOG,
+  saveStages,
+  setStagesList,
+  resetStagesToDefault,
+  createNewStageTemplate,
+} from './stages.js';
+import { buildStageWorld, createTerrainPropMesh, MAP_BOUNDS } from './world.js';
 import { PlayerHero, BuildPad, RedEnemy, DroppedCoin, TowerProjectile } from './entities.js';
 import { sfx } from './audio.js';
 
@@ -9,8 +17,7 @@ const viewportEl = document.getElementById('game-viewport');
 const canvasEl = document.getElementById('game-canvas');
 const worldLabelsEl = document.getElementById('world-labels');
 
-const stageBadgeEl = document.getElementById('stage-badge');
-const stageTitleEl = document.getElementById('stage-title');
+const stageSelectEl = document.getElementById('stage-select');
 const waveTextEl = document.getElementById('wave-text');
 const enemyCountTextEl = document.getElementById('enemy-count-text');
 const waveProgressFillEl = document.getElementById('wave-progress-fill');
@@ -24,6 +31,23 @@ const coinCountEl = document.getElementById('coin-count');
 const centerBannerEl = document.getElementById('center-banner');
 const bannerSubEl = document.getElementById('banner-subtitle');
 const bannerTitleEl = document.getElementById('banner-title');
+
+const combatDockEl = document.getElementById('combat-dock');
+const editorDockEl = document.getElementById('editor-dock');
+const editorTopbarEl = document.getElementById('editor-topbar');
+const editorBtnEl = document.getElementById('btn-editor');
+
+const edStageNameInput = document.getElementById('ed-stage-name');
+const edStartCoinsInput = document.getElementById('ed-start-coins');
+const edCastleHpInput = document.getElementById('ed-castle-hp');
+const edAddStageBtn = document.getElementById('btn-ed-add-stage');
+const edDelStageBtn = document.getElementById('btn-ed-del-stage');
+const edResetAllBtn = document.getElementById('btn-ed-reset-all');
+const edPlayBtn = document.getElementById('btn-ed-play');
+
+const edScaleBtn = document.getElementById('btn-ed-scale');
+const edRotateBtn = document.getElementById('btn-ed-rotate');
+const edClearPropsBtn = document.getElementById('btn-ed-clear-props');
 
 const skillBtnEl = document.getElementById('btn-skill');
 const skillStatusEl = document.getElementById('skill-status');
@@ -50,14 +74,15 @@ renderer.toneMappingExposure = 1.08;
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x7dd3fc);
-scene.fog = new THREE.FogExp2(0x7dd3fc, 0.0065);
+scene.fog = new THREE.FogExp2(0x7dd3fc, 0.006);
 
-// 위에서 비스듬히 내려다보는 아이소메트릭 시점 카메라 (전장이 넓고 시원하게 보이도록 조정)
-const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.5, 180);
-const CAMERA_OFFSET = new THREE.Vector3(0, 32, 24);
+// 위에서 비스듬히 내려다보는 아이소메트릭 시점 카메라
+const camera = new THREE.PerspectiveCamera(42, 16 / 9, 0.5, 190);
+const PLAY_CAMERA_OFFSET = new THREE.Vector3(0, 32, 24);
+const EDITOR_CAMERA_OFFSET = new THREE.Vector3(0, 46, 26);
 const cameraFocus = new THREE.Vector3(0, 0, 0);
 
-// 조명 구성 (화사하고 선명한 캐주얼 로우폴리 분위기)
+// 조명 구성
 const hemiLight = new THREE.HemisphereLight(0xfffbeb, 0x3f6212, 0.95);
 scene.add(hemiLight);
 
@@ -79,13 +104,24 @@ scene.add(dirLight);
 // 레이캐스터 및 마우스 상태
 const raycaster = new THREE.Raycaster();
 const mouseNDC = new THREE.Vector2(0, 0);
+const currentGroundHit = new THREE.Vector3(0, 0, 0);
 let hasMouseMoved = false;
+
+// 에디터 브러시 상태
+const SCALE_PRESETS = [0.85, 1.2, 1.55];
+const editorState = {
+  brush: 'forest', // 'forest' | 'rock' | 'lake' | 'river' | 'mountain' | 'signpost' | 'pad' | 'erase'
+  scaleIdx: 1,
+  rotation: 0,
+  previewGroup: new THREE.Group(),
+};
+scene.add(editorState.previewGroup);
 
 // 게임 상태 관리
 const state = {
-  mode: 'intro', // 'intro' | 'playing' | 'stage_clear' | 'victory' | 'defeat'
-  stageIndex: 0, // 0, 1, 2 (총 3개 스테이지)
-  coins: 70,
+  mode: 'intro', // 'intro' | 'playing' | 'editor' | 'stage_clear' | 'victory' | 'defeat'
+  stageIndex: 0,
+  coins: 75,
   castleHp: 100,
   castleMaxHp: 100,
   selectedTower: 'crossbow',
@@ -121,7 +157,7 @@ handleResize();
 
 // 중앙 알림 배너 표시
 let bannerTimeout = null;
-function showBanner(subtitle, title, duration = 2000) {
+function showBanner(subtitle, title, duration = 1800) {
   bannerSubEl.textContent = subtitle;
   bannerTitleEl.textContent = title;
   centerBannerEl.classList.remove('hidden');
@@ -142,7 +178,7 @@ function worldToScreen(vec3) {
   };
 }
 
-// 플로팅 텍스트 이펙트 생성 (데미지, 코인 획득, 건설 알림)
+// 플로팅 텍스트 이펙트 생성
 function spawnFloatingText(worldPos, text, color = '#fef08a') {
   const screen = worldToScreen(worldPos);
   if (!screen.visible) return;
@@ -211,6 +247,33 @@ function spawnCoinFeedArc(fromPos, toPos) {
   });
 }
 
+// 스테이지 선택 드롭다운 갱신
+function refreshStageSelectUI() {
+  stageSelectEl.innerHTML = '';
+  STAGES.forEach((st, idx) => {
+    const opt = document.createElement('option');
+    opt.value = String(idx);
+    opt.textContent = `STAGE ${idx + 1}/${STAGES.length} · ${st.name}`;
+    if (idx === state.stageIndex) opt.selected = true;
+    stageSelectEl.appendChild(opt);
+  });
+
+  const curStage = STAGES[state.stageIndex];
+  if (curStage) {
+    edStageNameInput.value = curStage.name;
+    edStartCoinsInput.value = curStage.startCoins;
+    edCastleHpInput.value = curStage.castleMaxHp;
+  }
+}
+
+stageSelectEl.addEventListener('change', () => {
+  const idx = parseInt(stageSelectEl.value, 10);
+  if (!Number.isNaN(idx) && STAGES[idx]) {
+    const keepEditor = state.mode === 'editor';
+    loadStage(idx, keepEditor);
+  }
+});
+
 // 현재 스테이지 정리
 function clearCurrentStage() {
   if (state.world) {
@@ -239,12 +302,31 @@ function clearCurrentStage() {
   state.effects = [];
 }
 
+// 건설 구역 패드 및 라벨 재구성
+function rebuildPadsForCurrentStage() {
+  state.pads.forEach((p) => p.destroy());
+  state.pads = [];
+  state.padLabels.forEach((el) => el.remove());
+  state.padLabels = [];
+
+  const stageData = STAGES[state.stageIndex];
+  (stageData.buildPads || []).forEach((padData, idx) => {
+    const pad = new BuildPad(scene, padData, idx);
+    state.pads.push(pad);
+
+    const labelEl = document.createElement('div');
+    labelEl.className = 'pad-label';
+    worldLabelsEl.appendChild(labelEl);
+    state.padLabels.push(labelEl);
+  });
+}
+
 // 스테이지 로드 및 초기화
-function loadStage(stageIndex) {
+function loadStage(stageIndex, enterEditor = false) {
   clearCurrentStage();
 
-  state.stageIndex = stageIndex;
-  const stageData = STAGES[stageIndex];
+  state.stageIndex = Math.max(0, Math.min(STAGES.length - 1, stageIndex));
+  const stageData = STAGES[state.stageIndex];
 
   state.coins = stageData.startCoins;
   state.castleMaxHp = stageData.castleMaxHp;
@@ -252,7 +334,6 @@ function loadStage(stageIndex) {
   state.waveIndex = 0;
   state.defeatedStageEnemies = 0;
 
-  // 전체 적 수 계산
   let totalCount = 0;
   stageData.waves.forEach((w) => {
     w.groups.forEach((g) => {
@@ -264,31 +345,25 @@ function loadStage(stageIndex) {
   // 3D 월드 생성
   state.world = buildStageWorld(scene, stageData);
 
-  // 플레이어 스폰 (길 중앙 근처 안전 지대)
+  // 플레이어 스폰
   state.player = new PlayerHero(scene, 0, 0);
   cameraFocus.copy(state.player.position);
-  camera.position.copy(cameraFocus).add(CAMERA_OFFSET);
+  camera.position.copy(cameraFocus).add(PLAY_CAMERA_OFFSET);
   camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
 
-  // 건설 구역 및 각 건설 구역 위 코인 비용 배지 생성
-  stageData.buildPads.forEach((padData, idx) => {
-    const pad = new BuildPad(scene, padData, idx);
-    state.pads.push(pad);
+  // 건설 구역 생성
+  rebuildPadsForCurrentStage();
+  refreshStageSelectUI();
 
-    const labelEl = document.createElement('div');
-    labelEl.className = 'pad-label';
-    worldLabelsEl.appendChild(labelEl);
-    state.padLabels.push(labelEl);
-  });
-
-  // 첫 웨이브 준비
-  prepareWave(0);
-  state.mode = 'playing';
-
-  stageBadgeEl.textContent = `STAGE ${stageData.id}/${STAGES.length}`;
-  stageTitleEl.textContent = stageData.name;
+  if (enterEditor) {
+    setEditorMode(true);
+  } else {
+    setEditorMode(false);
+    prepareWave(0);
+    state.mode = 'playing';
+    showBanner(`STAGE ${state.stageIndex + 1}`, `${stageData.name} 방어 시작!`);
+  }
   updateHud();
-  showBanner(stageData.subtitle, `${stageData.name} 방어 시작!`);
 }
 
 // 웨이브 스폰 큐 생성
@@ -313,37 +388,337 @@ function prepareWave(waveIdx) {
   state.spawnQueue.sort((a, b) => a.spawnTime - b.spawnTime);
 
   if (waveIdx > 0) {
-    showBanner(`STAGE ${stageData.id}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1600);
+    showBanner(`STAGE ${stageData.id}`, `웨이브 ${waveIdx + 1} 몰려옵니다!`, 1500);
   }
 }
 
-// 마우스 지면 레이캐스팅으로 플레이어 목표 지점 갱신
-function updatePlayerTargetFromMouse() {
-  if (!hasMouseMoved || !state.world || !state.player || state.mode !== 'playing') return;
+// ==========================================================
+// 인게임 3D 스테이지 & 지형물 에디터 로직
+// ==========================================================
+
+function rebuildEditorGhostPreview() {
+  while (editorState.previewGroup.children.length > 0) {
+    editorState.previewGroup.remove(editorState.previewGroup.children[0]);
+  }
+  if (state.mode !== 'editor') {
+    editorState.previewGroup.visible = false;
+    return;
+  }
+
+  editorState.previewGroup.visible = true;
+  const scale = SCALE_PRESETS[editorState.scaleIdx];
+  const brush = editorState.brush;
+
+  if (brush === 'erase') {
+    const ringGeo = new THREE.RingGeometry(1.2, 1.65, 24).rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xef4444,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.y = 0.15;
+    editorState.previewGroup.add(ring);
+  } else if (brush === 'pad') {
+    const padPreview = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.75, 1.95, 0.25, 8),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: false, transparent: true, opacity: 0.7 })
+    );
+    padPreview.position.y = 0.14;
+    editorState.previewGroup.add(padPreview);
+  } else {
+    const propMesh = createTerrainPropMesh(brush, scale, editorState.rotation);
+    editorState.previewGroup.add(propMesh);
+
+    const ringGeo = new THREE.RingGeometry(1.4 * scale, 1.65 * scale, 24).rotateX(-Math.PI / 2);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x38bdf8,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.75,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.position.y = 0.12;
+    editorState.previewGroup.add(ring);
+  }
+}
+
+function setEditorMode(enabled) {
+  if (enabled) {
+    state.mode = 'editor';
+    // 에디터 진입 시 현재 스폰된 적과 발사체 정리
+    state.enemies.forEach((e) => e.destroy());
+    state.enemies = [];
+    state.projectiles.forEach((p) => p.destroy());
+    state.projectiles = [];
+    state.coinsList.forEach((c) => c.destroy());
+    state.coinsList = [];
+
+    editorBtnEl.classList.add('active');
+    editorTopbarEl.classList.remove('hidden');
+    editorDockEl.classList.remove('hidden');
+    combatDockEl.classList.add('hidden');
+    if (state.player) state.player.targetMarker.visible = false;
+
+    rebuildEditorGhostPreview();
+    showBanner('🛠️ 스테이지 & 지형 에디터', '클릭: 지형물 배치 · 우클릭/삭제브러시: 지형물 삭제', 2200);
+  } else {
+    editorBtnEl.classList.remove('active');
+    editorTopbarEl.classList.add('hidden');
+    editorDockEl.classList.add('hidden');
+    combatDockEl.classList.remove('hidden');
+    editorState.previewGroup.visible = false;
+    if (state.player) state.player.targetMarker.visible = true;
+  }
+}
+
+editorBtnEl.addEventListener('click', () => {
+  if (state.mode === 'intro') {
+    modalOverlayEl.classList.add('hidden');
+  }
+  if (state.mode === 'editor') {
+    loadStage(state.stageIndex, false);
+  } else {
+    loadStage(state.stageIndex, true);
+  }
+});
+
+edPlayBtn.addEventListener('click', () => {
+  loadStage(state.stageIndex, false);
+});
+
+// 에디터 브러시 선택
+document.querySelectorAll('.brush-btn').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    editorState.brush = btn.dataset.brush;
+    document.querySelectorAll('.brush-btn').forEach((b) => {
+      b.classList.toggle('active', b === btn);
+    });
+    rebuildEditorGhostPreview();
+  });
+});
+
+// 크기 변경 버튼
+edScaleBtn.addEventListener('click', () => {
+  editorState.scaleIdx = (editorState.scaleIdx + 1) % SCALE_PRESETS.length;
+  const s = SCALE_PRESETS[editorState.scaleIdx];
+  edScaleBtn.textContent = `크기: ${s}x`;
+  rebuildEditorGhostPreview();
+});
+
+// 회전 버튼
+function rotateEditorBrush() {
+  editorState.rotation = (editorState.rotation + Math.PI / 4) % (Math.PI * 2);
+  rebuildEditorGhostPreview();
+}
+edRotateBtn.addEventListener('click', rotateEditorBrush);
+
+// 현재 스테이지 모든 지형물 비우기
+edClearPropsBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  stageData.props = [];
+  saveStages(STAGES);
+  loadStage(state.stageIndex, true);
+  showBanner('지형물 초기화', '현재 스테이지의 지형물을 모두 비웠습니다.', 1400);
+});
+
+// 스테이지 메타 정보(이름, 시작 코인, 성채 체력) 실시간 수정 반영
+function onStageMetaInput() {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  stageData.name = edStageNameInput.value.trim() || `스테이지 ${state.stageIndex + 1}`;
+  stageData.startCoins = Math.max(30, parseInt(edStartCoinsInput.value, 10) || 75);
+  stageData.castleMaxHp = Math.max(50, parseInt(edCastleHpInput.value, 10) || 100);
+  state.coins = stageData.startCoins;
+  state.castleMaxHp = stageData.castleMaxHp;
+  state.castleHp = stageData.castleMaxHp;
+  saveStages(STAGES);
+  refreshStageSelectUI();
+  updateHud();
+}
+
+edStageNameInput.addEventListener('input', onStageMetaInput);
+edStartCoinsInput.addEventListener('change', onStageMetaInput);
+edCastleHpInput.addEventListener('change', onStageMetaInput);
+
+// 새 스테이지 추가
+edAddStageBtn.addEventListener('click', () => {
+  const newStage = createNewStageTemplate(STAGES.length + 1);
+  STAGES.push(newStage);
+  saveStages(STAGES);
+  loadStage(STAGES.length - 1, true);
+  showBanner('스테이지 추가 완료', `STAGE ${STAGES.length} (${newStage.name}) 생성됨!`, 1800);
+});
+
+// 현재 스테이지 삭제
+edDelStageBtn.addEventListener('click', () => {
+  if (STAGES.length <= 1) {
+    showBanner('삭제 불가', '최소 1개의 스테이지는 남아있어야 합니다.', 1600);
+    return;
+  }
+  const removedName = STAGES[state.stageIndex].name;
+  STAGES.splice(state.stageIndex, 1);
+  saveStages(STAGES);
+  const nextIdx = Math.max(0, state.stageIndex - 1);
+  loadStage(nextIdx, true);
+  showBanner('스테이지 삭제됨', `'${removedName}' 스테이지가 삭제되었습니다.`, 1600);
+});
+
+// 모든 스테이지 & 지형물 기본값 복원
+edResetAllBtn.addEventListener('click', () => {
+  const defaults = resetStagesToDefault();
+  setStagesList(defaults);
+  loadStage(0, true);
+  showBanner('기본값 복원 완료', '기본 3개 스테이지와 지형물로 복원되었습니다.', 1800);
+});
+
+// 에디터에서 지형물/건설구역 삭제 헬퍼
+function eraseNearestAtPoint(worldPt) {
+  const stageData = STAGES[state.stageIndex];
+  let bestPropIdx = -1;
+  let bestPropDist = 3.8;
+
+  (stageData.props || []).forEach((p, idx) => {
+    const d = Math.hypot(p.x - worldPt.x, p.z - worldPt.z);
+    if (d < bestPropDist) {
+      bestPropDist = d;
+      bestPropIdx = idx;
+    }
+  });
+
+  let bestPadIdx = -1;
+  let bestPadDist = 2.6;
+  (stageData.buildPads || []).forEach((pad, idx) => {
+    const d = Math.hypot(pad.x - worldPt.x, pad.z - worldPt.z);
+    if (d < bestPadDist) {
+      bestPadDist = d;
+      bestPadIdx = idx;
+    }
+  });
+
+  if (bestPropIdx !== -1 && (bestPadIdx === -1 || bestPropDist <= bestPadDist)) {
+    const removed = stageData.props.splice(bestPropIdx, 1)[0];
+    const mesh = state.world.propInstances[bestPropIdx];
+    if (mesh) {
+      state.world.propsGroup.remove(mesh);
+      state.world.propInstances.splice(bestPropIdx, 1);
+    }
+    saveStages(STAGES);
+    sfx.playEnemyDefeat();
+    spawnRingEffect(worldPt, 1.8, 0xef4444, 0.22);
+    const info = PROP_CATALOG[removed.type] || { emoji: '🧹', name: '지형물' };
+    spawnFloatingText(worldPt.clone().setY(1.8), `${info.emoji} ${info.name} 삭제`, '#f87171');
+    return true;
+  }
+
+  if (bestPadIdx !== -1) {
+    stageData.buildPads.splice(bestPadIdx, 1);
+    rebuildPadsForCurrentStage();
+    saveStages(STAGES);
+    sfx.playEnemyDefeat();
+    spawnRingEffect(worldPt, 1.8, 0xef4444, 0.22);
+    spawnFloatingText(worldPt.clone().setY(1.8), '🪙 건설 구역 삭제', '#f87171');
+    return true;
+  }
+
+  return false;
+}
+
+// 에디터에서 캔버스 클릭 시 지형물/건설구역 배치 또는 삭제
+function handleEditorCanvasClick(worldPt, isRightClick = false) {
+  const stageData = STAGES[state.stageIndex];
+  const x = Math.round(THREE.MathUtils.clamp(worldPt.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX) * 10) / 10;
+  const z = Math.round(THREE.MathUtils.clamp(worldPt.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ) * 10) / 10;
+  const targetVec = new THREE.Vector3(x, 0, z);
+
+  if (isRightClick || editorState.brush === 'erase') {
+    eraseNearestAtPoint(targetVec);
+    return;
+  }
+
+  if (editorState.brush === 'pad') {
+    stageData.buildPads.push({ x, z, baseCost: 35 });
+    rebuildPadsForCurrentStage();
+    saveStages(STAGES);
+    sfx.playTowerBuilt();
+    spawnRingEffect(targetVec, 2.2, 0xfacc15, 0.28);
+    spawnFloatingText(targetVec.clone().setY(2.0), '+🪙 건설 구역 추가!', '#fde047');
+    return;
+  }
+
+  // 지형물(숲, 바위, 호수, 강, 산, 이정표) 배치
+  const scale = SCALE_PRESETS[editorState.scaleIdx];
+  const rot = Math.round(editorState.rotation * 100) / 100;
+  const newProp = {
+    type: editorState.brush,
+    x,
+    z,
+    scale,
+    rot,
+  };
+  if (!Array.isArray(stageData.props)) stageData.props = [];
+  stageData.props.push(newProp);
+
+  const mesh = createTerrainPropMesh(newProp.type, newProp.scale, newProp.rot);
+  mesh.position.set(x, 0, z);
+  state.world.propsGroup.add(mesh);
+  state.world.propInstances.push(mesh);
+
+  saveStages(STAGES);
+  sfx.playCoinPickup();
+  spawnRingEffect(targetVec, 2.2 * scale, 0x4ade80, 0.25);
+  const info = PROP_CATALOG[newProp.type] || { emoji: '🌲', name: '지형물' };
+  spawnFloatingText(targetVec.clone().setY(2.2), `+${info.emoji} ${info.name} 배치!`, '#4ade80');
+}
+
+// 마우스 지면 레이캐스팅
+function updateGroundRaycastFromMouse() {
+  if (!hasMouseMoved || !state.world) return;
   raycaster.setFromCamera(mouseNDC, camera);
   const hits = raycaster.intersectObject(state.world.raycastPlane);
   if (hits.length > 0) {
-    state.player.setMoveTarget(hits[0].point);
+    currentGroundHit.copy(hits[0].point);
+    if (state.mode === 'playing' && state.player) {
+      state.player.setMoveTarget(currentGroundHit);
+    } else if (state.mode === 'editor') {
+      editorState.previewGroup.position.set(
+        THREE.MathUtils.clamp(currentGroundHit.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX),
+        0,
+        THREE.MathUtils.clamp(currentGroundHit.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ)
+      );
+    }
   }
 }
 
-// 마우스 이벤트 바인딩 (뷰포트 전체에서 부드럽게 추적)
+// 마우스 이벤트 바인딩
 viewportEl.addEventListener('pointermove', (e) => {
   const rect = canvasEl.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   hasMouseMoved = true;
-  updatePlayerTargetFromMouse();
+  updateGroundRaycastFromMouse();
+});
+
+canvasEl.addEventListener('contextmenu', (e) => {
+  e.preventDefault();
 });
 
 canvasEl.addEventListener('pointerdown', (e) => {
-  if (e.button !== 0 || state.mode !== 'playing') return;
   const rect = canvasEl.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   hasMouseMoved = true;
-  updatePlayerTargetFromMouse();
-  triggerPlayerSkill();
+  updateGroundRaycastFromMouse();
+
+  if (state.mode === 'editor') {
+    handleEditorCanvasClick(currentGroundHit, e.button === 2);
+    return;
+  }
+
+  if (e.button === 0 && state.mode === 'playing') {
+    triggerPlayerSkill();
+  }
 });
 
 // 황금 충격파 베기 스킬 발동
@@ -384,7 +759,6 @@ function damageEnemy(enemy, amount, color = '#ffffff') {
     sfx.playEnemyDefeat();
     spawnRingEffect(enemy.position, 1.4, 0xef4444, 0.22);
 
-    // 적 처치 시 코인 드롭 (보스는 여러 개 드롭)
     const dropCount = enemy.def.isBoss ? 8 : Math.max(1, Math.round(enemy.coinReward / 6));
     const baseVal = Math.floor(enemy.coinReward / dropCount);
     const remainder = enemy.coinReward - baseVal * dropCount;
@@ -396,7 +770,7 @@ function damageEnemy(enemy, amount, color = '#ffffff') {
   }
 }
 
-// 타워 종류 선택 UI 및 단축키 (1, 2, 3, Space)
+// 타워 종류 선택 UI 및 단축키
 function selectTowerType(typeKey) {
   if (!TOWER_TYPES[typeKey]) return;
   state.selectedTower = typeKey;
@@ -416,6 +790,15 @@ skillBtnEl.addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', (e) => {
+  if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+
+  if (state.mode === 'editor') {
+    if (e.key === 'r' || e.key === 'R') {
+      rotateEditorBrush();
+    }
+    return;
+  }
+
   if (e.key === '1') selectTowerType('crossbow');
   if (e.key === '2') selectTowerType('cannon');
   if (e.key === '3') selectTowerType('frost');
@@ -432,7 +815,7 @@ soundBtnEl.addEventListener('click', () => {
 
 restartBtnEl.addEventListener('click', () => {
   if (state.mode === 'intro') return;
-  loadStage(state.stageIndex);
+  loadStage(state.stageIndex, state.mode === 'editor');
 });
 
 // 모달 제어
@@ -454,14 +837,19 @@ function showModal({ badge, title, desc, buttonText, onAction }) {
 modalActionBtn.onclick = () => {
   sfx.init();
   modalOverlayEl.classList.add('hidden');
-  loadStage(0);
+  loadStage(0, false);
 };
 
 // HUD 및 건설 구역 3D 라벨 업데이트
 function updateHud() {
   const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+
   const aliveOrPending = Math.max(0, state.totalStageEnemies - state.defeatedStageEnemies);
-  waveTextEl.textContent = `웨이브 ${state.waveIndex + 1}/${stageData.waves.length}`;
+  waveTextEl.textContent =
+    state.mode === 'editor'
+      ? `에디터 모드 (지형물 ${(stageData.props || []).length}개)`
+      : `웨이브 ${state.waveIndex + 1}/${stageData.waves.length}`;
   enemyCountTextEl.textContent = `적 ${aliveOrPending}`;
 
   const progressPct =
@@ -507,7 +895,7 @@ function updateHud() {
     labelEl.style.top = `${screen.y}px`;
 
     const playerDist = state.player ? state.player.position.distanceTo(pad.position) : 999;
-    const isStanding = playerDist < 2.45;
+    const isStanding = state.mode === 'playing' && playerDist < 2.45;
     labelEl.classList.toggle('active-pad', isStanding);
 
     if (pad.level === 0) {
@@ -542,9 +930,27 @@ function gameLoop(now) {
   lastTime = now;
   const elapsed = now / 1000;
 
-  if (state.mode === 'playing' && state.player && state.world) {
-    // 카메라가 이동 중일 때도 마우스 포인터 지면 좌표를 계속 추적
-    updatePlayerTargetFromMouse();
+  if (state.mode === 'editor' && state.world) {
+    updateGroundRaycastFromMouse();
+
+    // 에디터 모드에서는 전장 전체가 한눈에 들어오도록 중앙 조망 카메라 유지
+    cameraFocus.lerp(new THREE.Vector3(0, 0, 0), Math.min(1, 6 * dt));
+    camera.position.lerp(
+      new THREE.Vector3().copy(cameraFocus).add(EDITOR_CAMERA_OFFSET),
+      Math.min(1, 6 * dt)
+    );
+    camera.lookAt(cameraFocus.x, 0, cameraFocus.z);
+
+    state.pads.forEach((p) => p.update(dt, elapsed));
+    for (let i = state.effects.length - 1; i >= 0; i--) {
+      if (state.effects[i].update(dt)) {
+        scene.remove(state.effects[i].mesh);
+        state.effects.splice(i, 1);
+      }
+    }
+    updateHud();
+  } else if (state.mode === 'playing' && state.player && state.world) {
+    updateGroundRaycastFromMouse();
 
     // 1. 플레이어 이동 업데이트
     state.player.update(dt, elapsed);
@@ -556,7 +962,7 @@ function gameLoop(now) {
       THREE.MathUtils.clamp(state.player.position.z, -16, 16)
     );
     cameraFocus.lerp(targetCamFocus, Math.min(1, 7.5 * dt));
-    camera.position.copy(cameraFocus).add(CAMERA_OFFSET);
+    camera.position.copy(cameraFocus).add(PLAY_CAMERA_OFFSET);
     camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
 
     // 성채 황금 코인 엠블럼 회전
@@ -575,7 +981,6 @@ function gameLoop(now) {
       }
     }
 
-    // 현재 웨이브의 모든 적이 스폰되었고 필드에 적이 거의 없으면 다음 웨이브 진행
     const allSpawned = state.spawnQueue.every((q) => q.spawned);
     const stageData = STAGES[state.stageIndex];
     if (
@@ -586,7 +991,7 @@ function gameLoop(now) {
       prepareWave(state.waveIndex + 1);
     }
 
-    // 4. 플레이어 자동 근접 공격 (사거리 내 가장 가까운 적 타격)
+    // 4. 플레이어 자동 근접 공격
     if (state.player.attackTimer <= 0 && state.enemies.length > 0) {
       let nearest = null;
       let minDist = state.player.attackRange;
@@ -605,7 +1010,6 @@ function gameLoop(now) {
         state.player.triggerSwing();
         sfx.playSlash();
 
-        // 범위 내 전방 적들에게 함께 참격 피해
         spawnRingEffect(state.player.position, state.player.attackRange * 0.85, 0x60a5fa, 0.18);
         for (const enemy of state.enemies) {
           if (enemy.dead || enemy.reachedCastle) continue;
@@ -620,7 +1024,6 @@ function gameLoop(now) {
     for (const pad of state.pads) {
       pad.update(dt, elapsed);
 
-      // 플레이어가 건설 구역 위에 서 있으면 코인을 소모해 방어탑 설치/업그레이드
       const distToPlayer = pad.position.distanceTo(state.player.position);
       if (distToPlayer < 2.45 && pad.level < pad.maxLevel && pad.feedCooldown <= 0) {
         const targetCost = pad.getCurrentTargetCost(
@@ -690,7 +1093,6 @@ function gameLoop(now) {
       if (proj.hit) {
         const st = proj.stats;
         if (st.id === 'cannon') {
-          // 화염 대포탑 광역 폭발 피해
           spawnRingEffect(proj.position, st.splashRadius, 0xf97316, 0.26);
           for (const enemy of state.enemies) {
             if (enemy.dead || enemy.reachedCastle) continue;
@@ -699,14 +1101,12 @@ function gameLoop(now) {
             }
           }
         } else if (st.id === 'frost') {
-          // 빙결 수정탑 감속 + 피해
           spawnRingEffect(proj.position, 1.8, 0x38bdf8, 0.22);
           if (proj.targetEnemy && !proj.targetEnemy.dead) {
             proj.targetEnemy.applySlow(st.slowFactor, st.slowDuration);
             damageEnemy(proj.targetEnemy, st.damage, '#7dd3fc');
           }
         } else {
-          // 연사 석궁탑 단일 피해
           if (proj.targetEnemy && !proj.targetEnemy.dead) {
             damageEnemy(proj.targetEnemy, st.damage, '#fde047');
           }
@@ -721,7 +1121,6 @@ function gameLoop(now) {
       const enemy = state.enemies[i];
       enemy.update(dt, elapsed, camera.position);
 
-      // 플레이어 근접 접촉 시 플레이어에게 소량의 피해
       if (!enemy.dead && !enemy.reachedCastle) {
         const dPlayer = enemy.position.distanceTo(state.player.position);
         if (dPlayer < 1.25 && enemy.attackCooldown <= 0) {
@@ -733,7 +1132,6 @@ function gameLoop(now) {
             '#f87171'
           );
 
-          // 플레이어 체력이 0이 되면 잠시 후 성채 앞에서 재정비 부활
           if (state.player.hp <= 0) {
             state.player.hp = state.player.maxHp;
             state.player.position.set(0, 0, 0);
@@ -803,13 +1201,12 @@ function gameLoop(now) {
         title: '🏰 성채가 함락되었습니다!',
         desc: '붉은 적 무리가 성문을 돌파했습니다.<br/>건설 구역에 방어탑을 더 빠르게 배치하고 황금 충격파를 활용해 다시 도전해 보세요!',
         buttonText: `STAGE ${state.stageIndex + 1} 다시 도전하기`,
-        onAction: () => loadStage(state.stageIndex),
+        onAction: () => loadStage(state.stageIndex, false),
       });
     } else if (
       state.defeatedStageEnemies >= state.totalStageEnemies &&
       state.enemies.length === 0
     ) {
-      // 남은 드롭 코인 자동 회수
       state.coinsList.forEach((c) => {
         state.coins += c.value;
         c.destroy();
@@ -824,18 +1221,18 @@ function gameLoop(now) {
         showModal({
           badge: `STAGE ${state.stageIndex + 1} CLEAR!`,
           title: `🎉 ${STAGES[state.stageIndex].name} 방어 성공!`,
-          desc: `주인공과 방어탑의 활약으로 붉은 적 무리를 모두 물리쳤습니다!<br/>다음 전장: <strong>STAGE ${nextStage.id} - ${nextStage.name}</strong>`,
-          buttonText: `다음 스테이지 출격 (STAGE ${nextStage.id})`,
-          onAction: () => loadStage(state.stageIndex + 1),
+          desc: `주인공과 방어탑의 활약으로 붉은 적 무리를 모두 물리쳤습니다!<br/>다음 전장: <strong>STAGE ${state.stageIndex + 2} - ${nextStage.name}</strong>`,
+          buttonText: `다음 스테이지 출격 (STAGE ${state.stageIndex + 2})`,
+          onAction: () => loadStage(state.stageIndex + 1, false),
         });
       } else {
         state.mode = 'victory';
         showModal({
-          badge: 'ALL 3 STAGES CLEARED · VICTORY!',
+          badge: `ALL ${STAGES.length} STAGES CLEARED · VICTORY!`,
           title: '👑 코인 수비대 최종 승리!',
-          desc: '총 3개 스테이지의 모든 붉은 적 무리와 군단 대장을 완벽히 물리치고 왕국의 성채를 지켜냈습니다!<br/>수고하셨습니다, 수비대장님!',
+          desc: `총 ${STAGES.length}개 스테이지의 모든 붉은 적 무리와 군단 대장을 완벽히 물리치고 왕국의 성채를 지켜냈습니다!<br/>상단 <strong>🛠️ 에디터</strong>에서 새로운 스테이지나 지형물을 직접 추가해 즐길 수도 있습니다!`,
           buttonText: 'STAGE 1부터 다시 플레이',
-          onAction: () => loadStage(0),
+          onAction: () => loadStage(0, false),
         });
       }
     }
@@ -847,7 +1244,7 @@ function gameLoop(now) {
 }
 
 // 초기 배경 프리뷰를 위해 Stage 1 월드를 먼저 렌더링하고 시작 모달을 띄움
-loadStage(0);
+loadStage(0, false);
 state.mode = 'intro';
 modalOverlayEl.classList.remove('hidden');
 requestAnimationFrame(gameLoop);
