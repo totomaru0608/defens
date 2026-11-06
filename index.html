@@ -120,28 +120,47 @@
 
           <!-- 하단 영역: 플레이 중에는 방어탑 도크 / 에디터 모드에서는 지형물 브러시 도크 -->
           <div class="hud-bottom">
-            <!-- 전투 모드 하단 도크 -->
+            <!-- 전투 & 건국(작은 마을➔타운➔시장➔무역소➔성) 통합 하단 도크 -->
             <div id="combat-dock" class="tower-dock">
-              <button class="tower-card active" data-tower="crossbow" title="숫자키 1: 빠른 단일 사격 석궁탑">
+              <button class="tower-card active" data-tower="crossbow" title="숫자키 1: 넓은 사거리의 정찰 사격 감시탑">
                 <span class="key-hint">1</span>
-                <span class="tower-emoji">🏹</span>
-                <span class="tower-label">석궁탑 <small>🪙30</small></span>
+                <span class="tower-emoji">🔭</span>
+                <span class="tower-label">감시탑 <small>🪙30</small></span>
               </button>
-              <button class="tower-card" data-tower="cannon" title="숫자키 2: 광역 폭발 화염 포탑">
+              <button class="tower-card" data-tower="cannon" title="숫자키 2: 강력한 광역 화포 사격 방어탑">
                 <span class="key-hint">2</span>
-                <span class="tower-emoji">💣</span>
-                <span class="tower-label">화염탑 <small>🪙45</small></span>
+                <span class="tower-emoji">🏹</span>
+                <span class="tower-label">방어탑 <small>🪙45</small></span>
               </button>
-              <button class="tower-card" data-tower="frost" title="숫자키 3: 적 이동속도 감속 수정탑">
+              <button class="tower-card" data-tower="frost" title="숫자키 3: 적의 이동속도를 늦추는 목책 울타리">
                 <span class="key-hint">3</span>
-                <span class="tower-emoji">❄️</span>
-                <span class="tower-label">빙결탑 <small>🪙40</small></span>
+                <span class="tower-emoji">🪵</span>
+                <span class="tower-label">울타리 <small>🪙25</small></span>
+              </button>
+              <button class="tower-card" data-tower="wall" title="숫자키 4: 견고한 석조 성벽 보루 (광역 충격파 + 감속)">
+                <span class="key-hint">4</span>
+                <span class="tower-emoji">🧱</span>
+                <span class="tower-label">성벽 <small>🪙55</small></span>
               </button>
               <div class="dock-sep"></div>
               <button id="btn-skill" class="skill-card" title="마우스 좌클릭 또는 Space 키로 발동">
                 <span class="key-hint">클릭/Space</span>
                 <span class="tower-emoji">⚡</span>
                 <span id="skill-status" class="tower-label">황금 충격파</span>
+              </button>
+              <div class="dock-sep"></div>
+              <!-- 현실 경제 건국 체인: 작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성(Castle) -->
+              <div class="kingdom-mini-stats" title="식량(🍖) · 주민 인구(👥) · 주기별 세금 수입(🪙) · 실시간 접속자(🌐)">
+                <span id="kd-stage-badge" class="kd-stage-pill">⛺ 1단계: 작은 마을</span>
+                <span id="kd-econ-text">🍖30 · 👥3명 · 세금+🪙13 · 🌐3</span>
+              </div>
+              <button
+                id="btn-kd-advance"
+                class="kd-upgrade-btn castle-btn"
+                title="세금(🪙)과 식량(🍖)을 사용해 [작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성(Castle)] 순서로 발전시킵니다 (단축키 5)"
+              >
+                <span id="kd-next-title">🏘️ 타운 건설 (2단계)</span>
+                <small id="kd-next-cost">🪙45 · 🍖25 필요</small>
               </button>
             </div>
 

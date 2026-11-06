@@ -4,7 +4,7 @@ import { KINGDOM_CONFIG } from '../data/kingdomConfig.js';
 import { eventBus } from '../core/eventBus.js';
 
 /**
- * 🌲 Phase 1: 숲속 야생 사냥감 (사냥 시 식량 🍖 + 코인 🪙 드롭)
+ * 🌲 숲속 야생 사냥감 (사냥 시 식량 🍖 + 초기 세금 재원 🪙 획득)
  */
 export class WildPrey {
   constructor(scene, x, z) {
@@ -133,7 +133,7 @@ export class WildPrey {
 }
 
 /**
- * 🆘 Phase 1: 숲속에 고립된 생존자/동료 (접근 시 구출되어 인구 👥 + 호위 동료로 합류)
+ * 🆘 숲속에 고립된 유민/주민 (구출 시 마을/타운 인구 👥 증가 + 호위 동료 합류)
  */
 export class LostSurvivor {
   constructor(scene, x, z) {
@@ -206,7 +206,7 @@ export class LostSurvivor {
 }
 
 /**
- * ⚔️ 구출한 동료 유닛 (플레이어 호위 + 야생 사냥 + 침략군 합동 공격)
+ * ⚔️ 구출한 호위 동료 유닛
  */
 export class CompanionUnit {
   constructor(scene, x, z, index = 0) {
@@ -334,7 +334,8 @@ export class CompanionUnit {
 }
 
 /**
- * 🏰 건국 5단계 도메인 매니저 (부락·농사·기술·시장·세금·대성곽 축조)
+ * 🏛️ 현실 경제·방어 건국 도메인 매니저
+ * [1단계: 아주 작은 마을] ➔ [2단계: 타운 건설] ➔ [3단계: 시장 완성] ➔ [4단계: 무역소 개설] ➔ [5단계: 성(Castle) 완성]
  */
 export class KingdomDomainManager {
   constructor(scene) {
@@ -343,23 +344,23 @@ export class KingdomDomainManager {
     scene.add(this.root);
 
     this.villageGroup = new THREE.Group();
-    this.farmGroup = new THREE.Group();
+    this.townGroup = new THREE.Group();
     this.marketGroup = new THREE.Group();
+    this.tradePostGroup = new THREE.Group();
     this.castleUpgradeGroup = new THREE.Group();
     this.windmillBlades = null;
+    this.tradeCartMesh = null;
 
     this.root.add(this.villageGroup);
-    this.root.add(this.farmGroup);
+    this.root.add(this.townGroup);
     this.root.add(this.marketGroup);
+    this.root.add(this.tradePostGroup);
     this.root.add(this.castleUpgradeGroup);
 
-    // 건국 상태 데이터
-    this.food = 35;
-    this.population = 2; // 초기 주민 2명
-    this.farmLevel = 1; // 초기 작은 텃밭
-    this.techLevel = 1;
-    this.marketLevel = 1;
-    this.castleTier = 1;
+    // 1단계(아주 작은 마을)에서 시작
+    this.settlementStep = 1; // 1: 작은 마을, 2: 타운, 3: 시장, 4: 무역소, 5: 성 완성
+    this.food = 30;
+    this.population = 3;
 
     this.foodAccum = 0;
     this.taxTimer = 0;
@@ -373,8 +374,36 @@ export class KingdomDomainManager {
 
     this.castleEndPt = new THREE.Vector3(26, 0, 8);
     this.villagePos = new THREE.Vector3(16, 0, 5);
-    this.farmPos = new THREE.Vector3(12, 0, 11);
+    this.townPos = new THREE.Vector3(12, 0, 11);
     this.marketPos = new THREE.Vector3(18, 0, -4);
+    this.tradePostPos = new THREE.Vector3(10, 0, -9);
+  }
+
+  getCurrentStepDef() {
+    const chain = KINGDOM_CONFIG.settlementChain;
+    return chain[Math.min(chain.length - 1, Math.max(0, this.settlementStep - 1))];
+  }
+
+  getNextStepDef() {
+    const chain = KINGDOM_CONFIG.settlementChain;
+    if (this.settlementStep >= chain.length) return null;
+    return chain[this.settlementStep];
+  }
+
+  getCombatMultiplier() {
+    return this.getCurrentStepDef().combatMultiplier || 1.0;
+  }
+
+  getFoodPerSec() {
+    const def = this.getCurrentStepDef();
+    const popBonus = 1 + this.population * 0.1;
+    return +(def.foodPerSec * popBonus).toFixed(1);
+  }
+
+  getTaxPerCycle() {
+    const def = this.getCurrentStepDef();
+    const citizenTax = Math.floor(this.population * 2.5);
+    return Math.round(def.baseTaxPerCycle + citizenTax);
   }
 
   initForStage(castleEndPt) {
@@ -384,31 +413,30 @@ export class KingdomDomainManager {
     const sx = castleEndPt.x > 0 ? -1 : 1;
     const sz = castleEndPt.z > 0 ? -1 : 1;
     this.villagePos.set(
-      THREE.MathUtils.clamp(castleEndPt.x + sx * 8.5, -24, 24),
+      THREE.MathUtils.clamp(castleEndPt.x + sx * 8.2, -24, 24),
       0,
-      THREE.MathUtils.clamp(castleEndPt.z + sz * 3.5, -13, 13)
+      THREE.MathUtils.clamp(castleEndPt.z + sz * 3.2, -13, 13)
     );
-    this.farmPos.set(
-      THREE.MathUtils.clamp(castleEndPt.x + sx * 14.5, -24, 24),
+    this.townPos.set(
+      THREE.MathUtils.clamp(castleEndPt.x + sx * 14.2, -24, 24),
       0,
-      THREE.MathUtils.clamp(castleEndPt.z + sz * 8.5, -13, 13)
+      THREE.MathUtils.clamp(castleEndPt.z + sz * 8.2, -13, 13)
     );
     this.marketPos.set(
       THREE.MathUtils.clamp(castleEndPt.x + sx * 8.0, -24, 24),
       0,
-      THREE.MathUtils.clamp(castleEndPt.z + sz * 10.5, -13, 13)
+      THREE.MathUtils.clamp(castleEndPt.z + sz * 10.2, -13, 13)
+    );
+    this.tradePostPos.set(
+      THREE.MathUtils.clamp(castleEndPt.x + sx * 14.5, -24, 24),
+      0,
+      THREE.MathUtils.clamp(castleEndPt.z + sz * 2.5, -13, 13)
     );
 
-    // 초기 숲 사냥감 3마리 & 고립된 주민 2명 스폰
-    for (let i = 0; i < 3; i++) {
-      this.spawnWildPrey();
-    }
-    for (let i = 0; i < 2; i++) {
-      this.spawnSurvivor();
-    }
+    for (let i = 0; i < 3; i++) this.spawnWildPrey();
+    for (let i = 0; i < 2; i++) this.spawnSurvivor();
 
-    // 기존 구출한 동료 수만큼 호위 동료 재생성
-    const compCount = Math.min(KINGDOM_CONFIG.rescue.maxCompanions, Math.max(1, this.population - 1));
+    const compCount = Math.min(KINGDOM_CONFIG.rescue.maxCompanions, Math.max(1, this.population - 2));
     for (let i = 0; i < compCount; i++) {
       this.companions.push(new CompanionUnit(this.scene, 0, 0, i));
     }
@@ -436,9 +464,9 @@ export class KingdomDomainManager {
       [14, -12],
     ];
     const [bx, bz] = spots[Math.floor(Math.random() * spots.length)];
-    const x = bx + (Math.random() - 0.5) * 4;
-    const z = bz + (Math.random() - 0.5) * 3;
-    this.wildPreys.push(new WildPrey(this.scene, x, z));
+    this.wildPreys.push(
+      new WildPrey(this.scene, bx + (Math.random() - 0.5) * 4, bz + (Math.random() - 0.5) * 3)
+    );
   }
 
   spawnSurvivor() {
@@ -451,45 +479,32 @@ export class KingdomDomainManager {
       [15, -11],
     ];
     const [bx, bz] = spots[Math.floor(Math.random() * spots.length)];
-    const x = bx + (Math.random() - 0.5) * 3;
-    const z = bz + (Math.random() - 0.5) * 3;
-    this.survivors.push(new LostSurvivor(this.scene, x, z));
+    this.survivors.push(
+      new LostSurvivor(this.scene, bx + (Math.random() - 0.5) * 3, bz + (Math.random() - 0.5) * 3)
+    );
   }
 
-  getCombatMultiplier() {
-    const t = KINGDOM_CONFIG.techs[this.techLevel - 1] || KINGDOM_CONFIG.techs[0];
-    return t.combatMult;
-  }
-
-  getEconomyMultiplier() {
-    const t = KINGDOM_CONFIG.techs[this.techLevel - 1] || KINGDOM_CONFIG.techs[0];
-    return t.economyMult;
-  }
-
-  getFoodPerSec() {
-    const f = KINGDOM_CONFIG.farms[this.farmLevel] || KINGDOM_CONFIG.farms[0];
-    const popBonus = 1 + this.population * 0.12;
-    return +(f.foodPerSec * popBonus * this.getEconomyMultiplier()).toFixed(1);
-  }
-
-  getTaxPerCycle() {
-    const m = KINGDOM_CONFIG.markets[this.marketLevel] || KINGDOM_CONFIG.markets[0];
-    const popTax = Math.floor(this.population * 2.5);
-    const tierBonus = (this.castleTier - 1) * 6;
-    return Math.round((m.taxPerCycle + popTax + tierBonus) * this.getEconomyMultiplier());
-  }
-
+  /**
+   * 3D 문명 단계별 건축물 재구축
+   * 1단계: 아주 작은 마을 (모닥불 + 작은 움막)
+   * 2단계: 타운 건설 (타운 회관 + 밀밭 농경지 + 회전 풍차)
+   * 3단계: 시장 완성 (타운 상설 시장 천막 + 상점가)
+   * 4단계: 무역소 개설 (대무역소 본관 + 금화 교역 마차)
+   * 5단계: 성(Castle) 완성 (석조 성벽 + 4대 황금 망루 + 대성곽 첨탑)
+   */
   rebuildStructures() {
     const clearGrp = (grp) => {
       while (grp.children.length > 0) grp.remove(grp.children[0]);
     };
     clearGrp(this.villageGroup);
-    clearGrp(this.farmGroup);
+    clearGrp(this.townGroup);
     clearGrp(this.marketGroup);
+    clearGrp(this.tradePostGroup);
     clearGrp(this.castleUpgradeGroup);
     this.windmillBlades = null;
+    this.tradeCartMesh = null;
 
-    // 1. 작은 부락 (모닥불 + 인구 비례 움막)
+    // 1단계 기본: 아주 작은 마을 (모닥불 + 오두막)
     this.villageGroup.position.copy(this.villagePos);
     const fireRing = new THREE.Mesh(
       new THREE.CylinderGeometry(0.65, 0.8, 0.22, 8),
@@ -505,97 +520,99 @@ export class KingdomDomainManager {
     flame.position.y = 0.48;
     this.villageGroup.add(flame);
 
-    const hutCount = Math.min(6, Math.max(1, Math.floor(this.population / 2)));
+    const hutCount = Math.min(6, Math.max(2, Math.floor(this.population / 2) + this.settlementStep));
     const hutWallMat = new THREE.MeshStandardMaterial({ color: 0xd97706, flatShading: true });
     const hutRoofMat = new THREE.MeshStandardMaterial({ color: 0x92400e, flatShading: true });
     for (let i = 0; i < hutCount; i++) {
       const ang = (i / 6) * Math.PI * 2;
       const hut = new THREE.Group();
-      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.68, 0.78, 0.85, 7), hutWallMat);
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.65, 0.76, 0.85, 7), hutWallMat);
       base.position.y = 0.42;
       base.castShadow = true;
       hut.add(base);
 
-      const roof = new THREE.Mesh(new THREE.ConeGeometry(0.95, 0.78, 7), hutRoofMat);
+      const roof = new THREE.Mesh(new THREE.ConeGeometry(0.92, 0.78, 7), hutRoofMat);
       roof.position.y = 1.18;
       roof.castShadow = true;
       hut.add(roof);
 
-      hut.position.set(Math.cos(ang) * 2.2, 0, Math.sin(ang) * 2.2);
+      hut.position.set(Math.cos(ang) * 2.25, 0, Math.sin(ang) * 2.25);
       this.villageGroup.add(hut);
     }
 
-    // 2. 농경지 (밀밭 + 회전 풍차)
-    if (this.farmLevel > 0) {
-      this.farmGroup.position.copy(this.farmPos);
+    // 2단계 이상: 타운 (Town Hall + 농경지 + 풍차)
+    if (this.settlementStep >= 2) {
+      this.townGroup.position.copy(this.townPos);
+      const townWallMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, flatShading: true });
+      const townRoofMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, flatShading: true });
       const soilMat = new THREE.MeshStandardMaterial({ color: 0x713f12, flatShading: true });
       const wheatMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, flatShading: true });
-      const plots = Math.min(4, this.farmLevel);
-      for (let i = 0; i < plots; i++) {
-        const ox = (i % 2 === 0 ? -1 : 1) * 1.45;
-        const oz = (Math.floor(i / 2) - 0.5) * 1.65;
-        const soil = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.14, 1.4), soilMat);
-        soil.position.set(ox, 0.07, oz);
-        this.farmGroup.add(soil);
 
-        const crop = new THREE.Mesh(
-          new THREE.BoxGeometry(1.1, 0.32 + this.farmLevel * 0.07, 1.1),
-          wheatMat
-        );
-        crop.position.set(ox, 0.25, oz);
-        this.farmGroup.add(crop);
+      // 타운 회관 (Town Hall)
+      const hall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.4, 1.7), townWallMat);
+      hall.position.set(0, 0.7, 0);
+      hall.castShadow = true;
+      this.townGroup.add(hall);
+
+      const hallRoof = new THREE.Mesh(new THREE.ConeGeometry(1.75, 1.1, 4), townRoofMat);
+      hallRoof.position.set(0, 1.95, 0);
+      hallRoof.rotation.y = Math.PI / 4;
+      hallRoof.castShadow = true;
+      this.townGroup.add(hallRoof);
+
+      // 타운 외곽 밀밭 & 풍차
+      for (let i = 0; i < 2; i++) {
+        const ox = (i === 0 ? -1 : 1) * 2.1;
+        const soil = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.14, 1.5), soilMat);
+        soil.position.set(ox, 0.07, 1.4);
+        this.townGroup.add(soil);
+
+        const crop = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.42, 1.2), wheatMat);
+        crop.position.set(ox, 0.28, 1.4);
+        this.townGroup.add(crop);
       }
 
-      const millTower = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.58, 0.85, 2.4, 8),
-        new THREE.MeshStandardMaterial({ color: 0xf8fafc, flatShading: true })
-      );
-      millTower.position.set(0, 1.2, -1.8);
+      const millTower = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.82, 2.3, 8), townWallMat);
+      millTower.position.set(0, 1.15, -2.0);
       millTower.castShadow = true;
-      this.farmGroup.add(millTower);
-
-      const millRoof = new THREE.Mesh(
-        new THREE.ConeGeometry(0.78, 0.8, 8),
-        new THREE.MeshStandardMaterial({ color: 0x9a3412, flatShading: true })
-      );
-      millRoof.position.set(0, 2.75, -1.8);
-      this.farmGroup.add(millRoof);
+      this.townGroup.add(millTower);
 
       const bladesPivot = new THREE.Group();
-      bladesPivot.position.set(0, 1.95, -1.15);
+      bladesPivot.position.set(0, 1.9, -1.35);
       for (let b = 0; b < 4; b++) {
         const blade = new THREE.Mesh(
-          new THREE.BoxGeometry(0.22, 2.0, 0.08),
+          new THREE.BoxGeometry(0.22, 1.95, 0.08),
           new THREE.MeshStandardMaterial({ color: 0xfef08a, flatShading: true })
         );
         blade.rotation.z = (b * Math.PI) / 2;
         bladesPivot.add(blade);
       }
-      this.farmGroup.add(bladesPivot);
+      this.townGroup.add(bladesPivot);
       this.windmillBlades = bladesPivot;
     }
 
-    // 3. 시장 & 대시장
-    if (this.marketLevel > 0) {
+    // 3단계 이상: 타운 시장 (Market) 완성
+    if (this.settlementStep >= 3) {
       this.marketGroup.position.copy(this.marketPos);
       const stallColors = [0xef4444, 0x3b82f6, 0xf59e0b, 0x10b981];
-      for (let i = 0; i < this.marketLevel; i++) {
-        const ox = (i % 2 === 0 ? -1 : 1) * 1.35;
-        const oz = (Math.floor(i / 2) - 0.5) * 1.6;
+      for (let i = 0; i < 4; i++) {
+        const ox = (i % 2 === 0 ? -1 : 1) * 1.4;
+        const oz = (Math.floor(i / 2) - 0.5) * 1.65;
         const stall = new THREE.Group();
         const counter = new THREE.Mesh(
-          new THREE.BoxGeometry(1.15, 0.6, 0.8),
+          new THREE.BoxGeometry(1.2, 0.62, 0.85),
           new THREE.MeshStandardMaterial({ color: 0x92400e, flatShading: true })
         );
-        counter.position.y = 0.3;
+        counter.position.y = 0.31;
         stall.add(counter);
 
         const canopy = new THREE.Mesh(
-          new THREE.ConeGeometry(0.95, 0.7, 4),
-          new THREE.MeshStandardMaterial({ color: stallColors[i % 4], flatShading: true })
+          new THREE.ConeGeometry(0.98, 0.72, 4),
+          new THREE.MeshStandardMaterial({ color: stallColors[i], flatShading: true })
         );
-        canopy.position.y = 1.15;
+        canopy.position.y = 1.18;
         canopy.rotation.y = Math.PI / 4;
+        canopy.castShadow = true;
         stall.add(canopy);
 
         stall.position.set(ox, 0, oz);
@@ -603,8 +620,50 @@ export class KingdomDomainManager {
       }
     }
 
-    // 4. 성곽 단계별 증축 (Tier 2~4)
-    if (this.castleTier > 1) {
+    // 4단계 이상: 무역소 (Trading Post) & 교역 마차 개설
+    if (this.settlementStep >= 4) {
+      this.tradePostGroup.position.copy(this.tradePostPos);
+      const guildMat = new THREE.MeshStandardMaterial({ color: 0xfef3c7, flatShading: true });
+      const goldRoofMat = new THREE.MeshStandardMaterial({
+        color: 0xd97706,
+        metalness: 0.35,
+        roughness: 0.4,
+        flatShading: true,
+      });
+
+      const guildHall = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.65, 1.9), guildMat);
+      guildHall.position.y = 0.82;
+      guildHall.castShadow = true;
+      this.tradePostGroup.add(guildHall);
+
+      const guildRoof = new THREE.Mesh(new THREE.ConeGeometry(2.0, 1.2, 4), goldRoofMat);
+      guildRoof.position.y = 2.25;
+      guildRoof.rotation.y = Math.PI / 4;
+      this.tradePostGroup.add(guildRoof);
+
+      // 황금 무역 마차 (Trade Caravan Cart)
+      const cart = new THREE.Group();
+      const wagon = new THREE.Mesh(
+        new THREE.BoxGeometry(1.1, 0.65, 0.75),
+        new THREE.MeshStandardMaterial({ color: 0x78350f, flatShading: true })
+      );
+      wagon.position.y = 0.52;
+      cart.add(wagon);
+
+      const goldCargo = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(0.42, 0),
+        new THREE.MeshStandardMaterial({ color: 0xfacc15, metalness: 0.5, flatShading: true })
+      );
+      goldCargo.position.y = 0.95;
+      cart.add(goldCargo);
+
+      cart.position.set(0, 0, 1.85);
+      this.tradePostGroup.add(cart);
+      this.tradeCartMesh = cart;
+    }
+
+    // 5단계(또는 2~5단계 점진적 성곽 강화): 성(Castle) 완성!
+    if (this.settlementStep >= 2) {
       this.castleUpgradeGroup.position.copy(this.castleEndPt);
       const stoneMat = new THREE.MeshStandardMaterial({
         color: 0xe2e8f0,
@@ -618,19 +677,19 @@ export class KingdomDomainManager {
         flatShading: true,
       });
       const roofMat = new THREE.MeshStandardMaterial({
-        color: this.castleTier >= 4 ? 0x7c3aed : 0x1d4ed8,
+        color: this.settlementStep >= 5 ? 0x7c3aed : 0x1d4ed8,
         roughness: 0.5,
         flatShading: true,
       });
 
       const wallRing = new THREE.Mesh(
-        new THREE.CylinderGeometry(5.4, 5.8, 1.6 + this.castleTier * 0.4, 10, 1, true),
+        new THREE.CylinderGeometry(5.4, 5.8, 1.4 + this.settlementStep * 0.38, 10, 1, true),
         stoneMat
       );
       wallRing.position.y = 0.85;
       this.castleUpgradeGroup.add(wallRing);
 
-      if (this.castleTier >= 3) {
+      if (this.settlementStep >= 4) {
         [
           [-4.3, -4.3],
           [4.3, -4.3],
@@ -648,21 +707,21 @@ export class KingdomDomainManager {
         });
       }
 
-      if (this.castleTier >= 4) {
-        const grandSpire = new THREE.Mesh(new THREE.CylinderGeometry(1.45, 2.0, 7.8, 8), stoneMat);
-        grandSpire.position.y = 3.9;
+      if (this.settlementStep >= 5) {
+        const grandSpire = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 2.1, 8.2, 8), stoneMat);
+        grandSpire.position.y = 4.1;
         grandSpire.castShadow = true;
         this.castleUpgradeGroup.add(grandSpire);
 
-        const crownRoof = new THREE.Mesh(new THREE.ConeGeometry(2.2, 3.0, 8), goldMat);
-        crownRoof.position.y = 9.2;
+        const crownRoof = new THREE.Mesh(new THREE.ConeGeometry(2.3, 3.2, 8), goldMat);
+        crownRoof.position.y = 9.6;
         this.castleUpgradeGroup.add(crownRoof);
 
         const auraRing = new THREE.Mesh(
-          new THREE.RingGeometry(6.2, 7.0, 32).rotateX(-Math.PI / 2),
+          new THREE.RingGeometry(6.3, 7.1, 32).rotateX(-Math.PI / 2),
           new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
         );
-        auraRing.position.y = 0.14;
+        auraRing.position.y = 0.15;
         this.castleUpgradeGroup.add(auraRing);
       }
     }
@@ -672,8 +731,11 @@ export class KingdomDomainManager {
     if (this.windmillBlades) {
       this.windmillBlades.rotation.z = elapsed * 2.5;
     }
+    if (this.tradeCartMesh) {
+      this.tradeCartMesh.position.x = Math.sin(elapsed * 1.8) * 1.6;
+    }
 
-    // 1. 농경지 식량 자동 생산
+    // 1. 마을·타운 식량 자동 생산
     this.foodAccum += this.getFoodPerSec() * dt;
     if (this.foodAccum >= 1) {
       const gained = Math.floor(this.foodAccum);
@@ -681,19 +743,35 @@ export class KingdomDomainManager {
       this.food += gained;
     }
 
-    // 2. 대시장 & 부락 세금(Tax/Coin) 자동 징수
+    // 2. 세금(돈 🪙) 징수 (작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성 단계에 따라 세금 폭증)
     this.taxTimer += dt;
     if (this.taxTimer >= KINGDOM_CONFIG.taxCycleSeconds) {
       this.taxTimer = 0;
       const taxCoins = this.getTaxPerCycle();
       onGrantCoins(taxCoins);
-      onFloatingText(this.marketPos.clone().setY(2.3), `+🪙${taxCoins} 시장 세금!`, '#fde047');
-      eventBus.emit('kingdom:tax_collected', { amount: taxCoins });
+      const taxAnchor =
+        this.settlementStep >= 4
+          ? this.tradePostPos
+          : this.settlementStep >= 3
+            ? this.marketPos
+            : this.settlementStep >= 2
+              ? this.townPos
+              : this.villagePos;
+      const sourceLabel =
+        this.settlementStep >= 4
+          ? '무역·시장 세금'
+          : this.settlementStep >= 3
+            ? '시장 상업세'
+            : this.settlementStep >= 2
+              ? '타운 세금'
+              : '마을 세금';
+      onFloatingText(taxAnchor.clone().setY(2.3), `+🪙${taxCoins} ${sourceLabel}!`, '#fde047');
+      eventBus.emit('kingdom:tax_collected', { amount: taxCoins, step: this.settlementStep });
     }
 
-    // 3. 성곽(Tier 2~4) 수호 포탑 자동 사격
-    const tierCfg = KINGDOM_CONFIG.castleTiers[this.castleTier - 1];
-    if (tierCfg && tierCfg.autoGuardDamage > 0 && enemies.length > 0) {
+    // 3. 타운/성곽 자동 방어 사격
+    const curDef = this.getCurrentStepDef();
+    if (curDef && curDef.autoGuardDamage > 0 && enemies.length > 0) {
       this.castleGuardTimer -= dt;
       if (this.castleGuardTimer <= 0) {
         let target = null;
@@ -708,12 +786,12 @@ export class KingdomDomainManager {
         }
         if (target) {
           this.castleGuardTimer = 1.05;
-          onHitEnemy(target, tierCfg.autoGuardDamage, '#fde047');
+          onHitEnemy(target, curDef.autoGuardDamage, '#fde047');
         }
       }
     }
 
-    // 4. 야생 사냥감 업데이트 및 플레이어 사냥 판정
+    // 4. 야생 사냥감 리스폰 및 사냥 판정
     this.preySpawnTimer -= dt;
     if (this.preySpawnTimer <= 0) {
       this.preySpawnTimer = KINGDOM_CONFIG.hunting.respawnInterval;
@@ -726,7 +804,7 @@ export class KingdomDomainManager {
       onFloatingText(prey.position.clone().setY(1.6), `-${dmg}`, '#bef264');
       if (killed) {
         const foodGain = KINGDOM_CONFIG.hunting.foodReward;
-        const coinGain = KINGDOM_CONFIG.hunting.coinReward;
+        const coinGain = KINGDOM_CONFIG.hunting.taxSeedReward;
         this.food += foodGain;
         onGrantCoins(coinGain);
         onFloatingText(
@@ -734,7 +812,6 @@ export class KingdomDomainManager {
           `🍖+${foodGain} 식량 · 🪙+${coinGain}`,
           '#84cc16'
         );
-        eventBus.emit('kingdom:prey_hunted', { foodGain, coinGain });
       }
     };
 
@@ -742,7 +819,7 @@ export class KingdomDomainManager {
       const prey = this.wildPreys[i];
       prey.update(dt, elapsed);
       if (!prey.dead && playerPos && prey.position.distanceTo(playerPos) <= 2.9) {
-        if (Math.random() < dt * 2.5) {
+        if (Math.random() < dt * 2.6) {
           handlePreyHit(prey, Math.round(24 * this.getCombatMultiplier()));
         }
       }
@@ -752,7 +829,7 @@ export class KingdomDomainManager {
       }
     }
 
-    // 5. 숲속 생존자/동료 구출 판정
+    // 5. 숲속 유민/동료 구출 판정
     this.survivorSpawnTimer -= dt;
     if (this.survivorSpawnTimer <= 0) {
       this.survivorSpawnTimer = KINGDOM_CONFIG.rescue.respawnInterval;
@@ -774,16 +851,15 @@ export class KingdomDomainManager {
         this.rebuildStructures();
         onFloatingText(
           sv.position.clone().setY(2.2),
-          `👥 동료 구출! (인구 ${this.population}명)`,
+          `👥 주민 합류! (인구 ${this.population}명)`,
           '#38bdf8'
         );
-        eventBus.emit('kingdom:survivor_rescued', { population: this.population });
         sv.destroy();
         this.survivors.splice(i, 1);
       }
     }
 
-    // 6. 호위 동료 유닛 업데이트
+    // 6. 호위 동료 전투 업데이트
     const combatMult = this.getCombatMultiplier();
     for (const comp of this.companions) {
       comp.update(
@@ -801,23 +877,24 @@ export class KingdomDomainManager {
 
   getSnapshot() {
     return {
+      settlementStep: this.settlementStep,
       food: this.food,
       population: this.population,
-      farmLevel: this.farmLevel,
-      techLevel: this.techLevel,
-      marketLevel: this.marketLevel,
-      castleTier: this.castleTier,
     };
   }
 
   applySnapshot(snap) {
     if (!snap) return;
+    let changed = false;
+    if (typeof snap.settlementStep === 'number' && snap.settlementStep > this.settlementStep) {
+      this.settlementStep = snap.settlementStep;
+      changed = true;
+    }
     if (typeof snap.food === 'number') this.food = Math.max(this.food, snap.food);
-    if (typeof snap.population === 'number') this.population = Math.max(this.population, snap.population);
-    if (typeof snap.farmLevel === 'number') this.farmLevel = Math.max(this.farmLevel, snap.farmLevel);
-    if (typeof snap.techLevel === 'number') this.techLevel = Math.max(this.techLevel, snap.techLevel);
-    if (typeof snap.marketLevel === 'number') this.marketLevel = Math.max(this.marketLevel, snap.marketLevel);
-    if (typeof snap.castleTier === 'number') this.castleTier = Math.max(this.castleTier, snap.castleTier);
-    this.rebuildStructures();
+    if (typeof snap.population === 'number' && snap.population > this.population) {
+      this.population = snap.population;
+      changed = true;
+    }
+    if (changed) this.rebuildStructures();
   }
 }

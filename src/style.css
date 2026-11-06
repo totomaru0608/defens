@@ -1326,3 +1326,74 @@ body {
   font-weight: 800;
   text-align: center;
 }
+
+/* ============================================================
+   건국 5단계(작은 마을 ➔ 타운 ➔ 시장 ➔ 무역소 ➔ 성) & 멀티플레이어 HUD
+   ============================================================ */
+.kingdom-mini-stats {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  border-radius: 9px;
+  padding: 0.25cqh 0.65cqw;
+  font-size: clamp(8.5px, 0.74cqw, 11px);
+  color: #e2e8f0;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.kd-stage-pill {
+  color: #fde047;
+  font-weight: 900;
+  font-size: clamp(9px, 0.8cqw, 11.5px);
+}
+
+.kd-upgrade-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: linear-gradient(135deg, rgba(30, 58, 138, 0.9), rgba(88, 28, 135, 0.9));
+  border: 1.5px solid #60a5fa;
+  border-radius: 9px;
+  padding: 0.3cqh 0.75cqw;
+  color: #ffffff;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.14s ease;
+}
+
+.kd-upgrade-btn span {
+  font-size: clamp(9.5px, 0.82cqw, 12px);
+  font-weight: 900;
+  color: #fef08a;
+}
+
+.kd-upgrade-btn small {
+  font-size: clamp(8px, 0.7cqw, 10.5px);
+  color: #bfdbfe;
+  font-weight: 700;
+}
+
+.kd-upgrade-btn.ready {
+  background: linear-gradient(135deg, #15803d, #0f766e);
+  border-color: #4ade80;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.45);
+}
+
+.kd-upgrade-btn.maxed {
+  background: linear-gradient(135deg, #b45309, #78350f);
+  border-color: #facc15;
+}
+
+.mp-nameplate {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid #34d399;
+  color: #a7f3d0;
+  font-size: clamp(8.5px, 0.72cqw, 10.5px);
+  padding: 1px 6px;
+}

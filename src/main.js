@@ -25,6 +25,15 @@ import {
   animateAnimalRig,
 } from './entities.js';
 import { sfx } from './audio.js';
+import { eventBus } from './core/eventBus.js';
+import {
+  saveLiveSessionSnapshot,
+  loadLiveSessionSnapshot,
+  clearLiveSessionSnapshot,
+  applyZeroDowntimeWorldPatch,
+} from './core/liveReloadGuard.js';
+import { KingdomDomainManager } from './domains/kingdomDomain.js';
+import { MultiplayerNetworkManager } from './network/multiplayerClient.js';
 
 // DOM 참조
 const viewportEl = document.getElementById('game-viewport');
@@ -41,6 +50,12 @@ const castleHpFillEl = document.getElementById('castle-hp-fill');
 const playerHpTextEl = document.getElementById('player-hp-text');
 const playerHpFillEl = document.getElementById('player-hp-fill');
 const coinCountEl = document.getElementById('coin-count');
+
+const kdStageBadgeEl = document.getElementById('kd-stage-badge');
+const kdEconTextEl = document.getElementById('kd-econ-text');
+const kdAdvanceBtnEl = document.getElementById('btn-kd-advance');
+const kdNextTitleEl = document.getElementById('kd-next-title');
+const kdNextCostEl = document.getElementById('kd-next-cost');
 
 const centerBannerEl = document.getElementById('center-banner');
 const bannerSubEl = document.getElementById('banner-subtitle');
@@ -197,6 +212,22 @@ const state = {
   projectiles: [],
   effects: [],
 };
+
+// 🏛️ 도메인 분리 모듈 인스턴스: 건국 문명 도메인 & 실시간 멀티플레이어 네트워크
+const kingdomDomain = new KingdomDomainManager(scene);
+const mpNetwork = new MultiplayerNetworkManager(scene, worldLabelsEl);
+let liveSessionSaveTimer = 0;
+
+eventBus.on('mp:kingdom_sync', (remoteSnap) => {
+  kingdomDomain.applySnapshot(remoteSnap);
+  updateHud();
+});
+
+eventBus.on('mp:world_patch', (patchPayload) => {
+  applyZeroDowntimeWorldPatch(patchPayload);
+  showBanner('⚡ 실시간 월드 무중단 패치 반영', '진행 중인 게임을 중단하지 않고 새로운 세계관 설정이 적용되었습니다!', 2200);
+  updateHud();
+});
 
 // ==========================================================
 // ComfyUI 3D 동물 리깅 & 모션 스튜디오 전용 미니 3D 프리뷰어
@@ -596,10 +627,18 @@ function loadStage(stageIndex, keepEditorOpen = false) {
 
   state.world = buildStageWorld(scene, stageData);
 
+  const curStepDef = kingdomDomain.getCurrentStepDef();
+  const hpBonus = curStepDef ? curStepDef.castleMaxHpBonus || 0 : 0;
+  state.castleMaxHp = stageData.castleMaxHp + hpBonus;
+  state.castleHp = state.castleMaxHp;
+
   state.player = new PlayerHero(scene, 0, 0);
   cameraFocus.copy(state.player.position);
   camera.position.copy(cameraFocus).add(PLAY_CAMERA_OFFSET);
   camera.lookAt(cameraFocus.x, 0.4, cameraFocus.z);
+
+  kingdomDomain.initForStage(state.world.endPt);
+  mpNetwork.initStageCoopPartners();
 
   rebuildPadsForCurrentStage();
   refreshStageSelectUI();
@@ -1630,6 +1669,61 @@ document.querySelectorAll('.tower-card').forEach((btn) => {
   });
 });
 
+// 🏛️ 문명 건국 단계 발전: [1. 아주 작은 마을] ➔ [2. 타운 건설] ➔ [3. 시장 완성] ➔ [4. 무역소 개설] ➔ [5. 성(Castle) 완성]
+function advanceKingdomSettlement() {
+  if (state.mode !== 'playing') return;
+  const nextDef = kingdomDomain.getNextStepDef();
+  if (!nextDef) {
+    showBanner('🏰 대성곽(Castle) 완성 달성!', '최종 5단계 성(Castle)까지 모두 완성되어 최고 세금·자동 수비 상태입니다!', 1800);
+    return;
+  }
+
+  const reqCoins = nextDef.reqCoins || 0;
+  const reqFood = nextDef.reqFood || 0;
+
+  if (state.coins < reqCoins || kingdomDomain.food < reqFood) {
+    showBanner(
+      '🪙 세금(돈) 또는 🍖 식량 부족',
+      `${nextDef.badge} 건설에는 🪙${reqCoins} 세금, 🍖${reqFood} 식량이 필요합니다! (현재: 🪙${state.coins}, 🍖${kingdomDomain.food})`,
+      2000
+    );
+    return;
+  }
+
+  state.coins -= reqCoins;
+  kingdomDomain.food -= reqFood;
+  const prevDef = kingdomDomain.getCurrentStepDef();
+  kingdomDomain.settlementStep += 1;
+  kingdomDomain.rebuildStructures();
+
+  const curDef = kingdomDomain.getCurrentStepDef();
+  const deltaHp = Math.max(0, (curDef.castleMaxHpBonus || 0) - (prevDef.castleMaxHpBonus || 0));
+  state.castleMaxHp += deltaHp;
+  state.castleHp = Math.min(state.castleMaxHp, state.castleHp + deltaHp + 35);
+
+  sfx.playStageClear();
+  spawnRingEffect(kingdomDomain.castleEndPt, 5.2, 0xfacc15, 0.48);
+  spawnFloatingText(
+    kingdomDomain.castleEndPt.clone().setY(3.8),
+    `${curDef.badge} 완성! (성채 HP +${deltaHp})`,
+    '#fde047'
+  );
+  showBanner(`🏛️ 문명 발전: ${curDef.badge}`, curDef.desc, 2400);
+
+  mpNetwork.sendPacket({
+    type: 'kingdom_upgrade',
+    kingdom: kingdomDomain.getSnapshot(),
+  });
+  saveLiveSessionSnapshot(state, kingdomDomain);
+  updateHud();
+}
+
+if (kdAdvanceBtnEl) {
+  kdAdvanceBtnEl.addEventListener('click', () => {
+    advanceKingdomSettlement();
+  });
+}
+
 skillBtnEl.addEventListener('click', () => {
   triggerPlayerSkill();
 });
@@ -1645,6 +1739,8 @@ window.addEventListener('keydown', (e) => {
   if (e.key === '1') selectTowerType('crossbow');
   if (e.key === '2') selectTowerType('cannon');
   if (e.key === '3') selectTowerType('frost');
+  if (e.key === '4') selectTowerType('wall');
+  if (e.key === '5') advanceKingdomSettlement();
   if (e.code === 'Space') {
     e.preventDefault();
     triggerPlayerSkill();
@@ -1712,6 +1808,32 @@ function updateHud() {
   }
 
   coinCountEl.textContent = `${state.coins}`;
+
+  // 🏛️ 상단 문명 단계 & 식량/인구/세금/동맹 현황 및 하단 발전 버튼 업데이트
+  const curStepDef = kingdomDomain.getCurrentStepDef();
+  const nextStepDef = kingdomDomain.getNextStepDef();
+  if (kdStageBadgeEl && curStepDef) {
+    kdStageBadgeEl.textContent = curStepDef.badge;
+  }
+  if (kdEconTextEl) {
+    kdEconTextEl.textContent = `🍖식량 ${kingdomDomain.food}(+${kingdomDomain.getFoodPerSec()}/s) · 👥인구 ${kingdomDomain.population}명 · 🪙세금 +${kingdomDomain.getTaxPerCycle()} · 🌐동맹 ${mpNetwork.getActivePlayerCount()}명`;
+  }
+  if (kdAdvanceBtnEl && kdNextTitleEl && kdNextCostEl) {
+    if (nextStepDef) {
+      const canAfford =
+        state.coins >= (nextStepDef.reqCoins || 0) &&
+        kingdomDomain.food >= (nextStepDef.reqFood || 0);
+      kdAdvanceBtnEl.classList.toggle('can-afford', canAfford);
+      kdAdvanceBtnEl.classList.remove('maxed');
+      kdNextTitleEl.textContent = `${nextStepDef.name} (${nextStepDef.step}/5)`;
+      kdNextCostEl.textContent = `🪙${nextStepDef.reqCoins} 세금 · 🍖${nextStepDef.reqFood} 식량`;
+    } else {
+      kdAdvanceBtnEl.classList.remove('can-afford');
+      kdAdvanceBtnEl.classList.add('maxed');
+      kdNextTitleEl.textContent = '🏰 5단계: 대성곽 완성됨';
+      kdNextCostEl.textContent = '👑 왕국 최종 단계 달성!';
+    }
+  }
 
   const selectedDef = TOWER_TYPES[state.selectedTower];
   state.pads.forEach((pad, idx) => {
@@ -1830,14 +1952,55 @@ function gameLoop(now) {
         state.player.triggerSwing();
         sfx.playSlash();
 
+        const combatMult = kingdomDomain.getCombatMultiplier();
         spawnRingEffect(state.player.position, state.player.attackRange * 0.85, 0x60a5fa, 0.18);
         for (const enemy of state.enemies) {
           if (enemy.dead || enemy.reachedCastle) continue;
           if (enemy.position.distanceTo(state.player.position) <= state.player.attackRange) {
-            damageEnemy(enemy, state.player.attackDamage, '#93c5fd');
+            damageEnemy(enemy, Math.round(state.player.attackDamage * combatMult), '#93c5fd');
           }
         }
       }
+    }
+
+    // 🌲 건국 문명 도메인 업데이트 (숲 사냥 · 유민 구출 · 농사 식량 · 시장/무역소 세금 징수 · 성곽 수비)
+    kingdomDomain.update(dt, elapsed, {
+      playerPos: state.player.position,
+      enemies: state.enemies,
+      onGrantCoins: (amount) => {
+        state.coins += amount;
+      },
+      onFloatingText: spawnFloatingText,
+      onHitEnemy: (enemy, dmg, color) => {
+        damageEnemy(enemy, dmg, color);
+      },
+    });
+
+    // 🌐 실시간 멀티플레이어 & 협동 영주 동기화 업데이트
+    mpNetwork.update(dt, elapsed, {
+      playerPos: state.player.position,
+      kingdomSnapshot: kingdomDomain.getSnapshot(),
+      enemies: state.enemies,
+      wildPreys: kingdomDomain.wildPreys,
+      survivors: kingdomDomain.survivors,
+      onHitEnemy: (enemy, dmg, color) => damageEnemy(enemy, dmg, color),
+      onHitPrey: (prey, dmg) => {
+        if (prey.dead) return;
+        const killed = prey.takeDamage(dmg);
+        if (killed) {
+          kingdomDomain.food += 18;
+          state.coins += 12;
+          spawnFloatingText(prey.position.clone().setY(2.0), '🏹 동맹 사냥! 🍖+18 · 🪙+12', '#6ee7b7');
+        }
+      },
+      worldToScreen,
+    });
+
+    // 🛡️ 무중단 업데이트 가드: 주기적으로 활성 플레이 상태 스냅샷 저장
+    liveSessionSaveTimer += dt;
+    if (liveSessionSaveTimer >= 2.0) {
+      liveSessionSaveTimer = 0;
+      saveLiveSessionSnapshot(state, kingdomDomain);
     }
 
     for (const pad of state.pads) {
@@ -1915,6 +2078,16 @@ function gameLoop(now) {
             if (enemy.dead || enemy.reachedCastle) continue;
             if (enemy.position.distanceTo(proj.position) <= st.splashRadius) {
               damageEnemy(enemy, st.damage, '#fb923c');
+            }
+          }
+        } else if (st.id === 'wall') {
+          const splash = st.splashRadius || 2.5;
+          spawnRingEffect(proj.position, splash, 0xfacc15, 0.28);
+          for (const enemy of state.enemies) {
+            if (enemy.dead || enemy.reachedCastle) continue;
+            if (enemy.position.distanceTo(proj.position) <= splash) {
+              enemy.applySlow(st.slowFactor || 0.45, st.slowDuration || 2.4);
+              damageEnemy(enemy, st.damage, '#fde047');
             }
           }
         } else if (st.id === 'frost') {
@@ -2057,6 +2230,53 @@ function gameLoop(now) {
 }
 
 loadStage(0, false);
-state.mode = 'intro';
-modalOverlayEl.classList.remove('hidden');
+
+// 🛡️ 무중단 업데이트(Zero-Downtime Live Reload) 세션 복원 검사:
+// 플레이 도중 코드/세계관 업데이트나 리로드가 발생했을 때 인트로 모달로 끊기지 않고 즉시 전투 및 마을 상태를 이어서 복원
+const savedSession = loadLiveSessionSnapshot();
+if (savedSession && typeof savedSession.stageIndex === 'number') {
+  if (savedSession.kingdom) {
+    kingdomDomain.applySnapshot(savedSession.kingdom);
+  }
+  loadStage(savedSession.stageIndex, false);
+  state.coins = savedSession.coins ?? state.coins;
+  state.castleMaxHp = savedSession.castleMaxHp ?? state.castleMaxHp;
+  state.castleHp = savedSession.castleHp ?? state.castleHp;
+  if (typeof savedSession.waveIndex === 'number' && savedSession.waveIndex > 0) {
+    prepareWave(savedSession.waveIndex);
+  }
+  if (Array.isArray(savedSession.padsState)) {
+    savedSession.padsState.forEach((ps, idx) => {
+      const pad = state.pads[idx];
+      if (pad && ps && ps.level > 0 && ps.towerType) {
+        for (let lv = 0; lv < ps.level; lv++) {
+          pad.constructOrUpgrade(ps.towerType);
+        }
+        pad.investedCoins = ps.investedCoins || 0;
+      }
+    });
+  }
+  if (savedSession.playerPos && state.player) {
+    state.player.position.set(savedSession.playerPos.x || 0, 0, savedSession.playerPos.z || 0);
+    state.player.targetPos.copy(state.player.position);
+  }
+  state.mode = 'playing';
+  modalOverlayEl.classList.add('hidden');
+  updateHud();
+  showBanner('🛡️ 무중단 업데이트 복원 완료', '진행 중이던 마을·타워·세금 상태가 초기화 없이 그대로 이어집니다!', 2200);
+} else {
+  state.mode = 'intro';
+  modalOverlayEl.classList.remove('hidden');
+}
+
+window.addEventListener('beforeunload', () => {
+  saveLiveSessionSnapshot(state, kingdomDomain);
+});
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    saveLiveSessionSnapshot(state, kingdomDomain);
+  });
+}
+
 requestAnimationFrame(gameLoop);

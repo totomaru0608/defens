@@ -677,7 +677,7 @@ export class BuildPad {
       this.towerGroup.remove(this.towerGroup.children[0]);
     }
 
-    const typeDef = TOWER_TYPES[this.towerType];
+    const typeDef = TOWER_TYPES[this.towerType] || TOWER_TYPES.crossbow;
     const stoneMat = makeLowPolyMaterial(0xe2e8f0);
     const woodMat = makeLowPolyMaterial(0x92400e);
     const accentMat = makeLowPolyMaterial(typeDef.color, {
@@ -688,12 +688,93 @@ export class BuildPad {
     const goldMat = makeLowPolyMaterial(0xfbbf24, { metalness: 0.4, roughness: 0.3 });
 
     const heightScale = 1 + (this.level - 1) * 0.22;
+    this.crystalMesh = null;
+
+    if (this.towerType === 'frost') {
+      // 🪵 울타리 (목책 방어선 - 날카로운 통나무 말뚝 원형 진지)
+      const stakeCount = 10 + this.level * 2;
+      for (let i = 0; i < stakeCount; i++) {
+        const ang = (i / stakeCount) * Math.PI * 2;
+        const stake = new THREE.Group();
+        const post = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16, 0.2, 1.35 * heightScale, 6),
+          woodMat
+        );
+        post.position.y = (1.35 * heightScale) / 2;
+        post.castShadow = true;
+        stake.add(post);
+
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.45, 6), goldMat);
+        tip.position.y = 1.35 * heightScale + 0.2;
+        stake.add(tip);
+
+        stake.position.set(Math.cos(ang) * 1.38, 0.2, Math.sin(ang) * 1.38);
+        stake.rotation.z = -Math.cos(ang) * 0.18;
+        stake.rotation.x = Math.sin(ang) * 0.18;
+        this.towerGroup.add(stake);
+      }
+
+      const centerPost = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.55, 0.7, 1.4 * heightScale, 7),
+        woodMat
+      );
+      centerPost.position.y = 0.24 + (1.4 * heightScale) / 2;
+      this.towerGroup.add(centerPost);
+
+      const topY = 0.24 + 1.4 * heightScale;
+      this.turretHead = new THREE.Group();
+      this.turretHead.position.set(0, topY + 0.3, 0);
+      this.towerGroup.add(this.turretHead);
+
+      const launcher = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.42, 0.95), accentMat);
+      this.turretHead.add(launcher);
+      return;
+    }
+
+    if (this.towerType === 'wall') {
+      // 🧱 성벽 (석조 보루 - 두꺼운 성곽 블록과 흉벽 Battlements)
+      const bastion = new THREE.Mesh(
+        new THREE.BoxGeometry(2.5, 1.85 * heightScale, 2.5),
+        stoneMat
+      );
+      bastion.position.y = 0.24 + (1.85 * heightScale) / 2;
+      bastion.castShadow = true;
+      bastion.receiveShadow = true;
+      this.towerGroup.add(bastion);
+
+      const topY = 0.24 + 1.85 * heightScale;
+      // 성벽 흉벽(메를론) 8개
+      [
+        [-0.95, -0.95],
+        [0, -0.95],
+        [0.95, -0.95],
+        [-0.95, 0],
+        [0.95, 0],
+        [-0.95, 0.95],
+        [0, 0.95],
+        [0.95, 0.95],
+      ].forEach(([mx, mz]) => {
+        const merlon = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.42, 0.46), darkMetalMat);
+        merlon.position.set(mx, topY + 0.21, mz);
+        this.towerGroup.add(merlon);
+      });
+
+      this.turretHead = new THREE.Group();
+      this.turretHead.position.set(0, topY + 0.42, 0);
+      this.towerGroup.add(this.turretHead);
+
+      const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.55, 1.35, 8), darkMetalMat);
+      turret.rotation.x = Math.PI / 2 - 0.12;
+      turret.position.set(0, 0.2, 0.35);
+      this.turretHead.add(turret);
+      return;
+    }
 
     const pillar = new THREE.Mesh(
-      new THREE.CylinderGeometry(1.05, 1.35, 1.7 * heightScale, 7),
-      stoneMat
+      new THREE.CylinderGeometry(1.05, 1.35, 1.75 * heightScale, 7),
+      this.towerType === 'crossbow' ? woodMat : stoneMat
     );
-    pillar.position.y = 0.24 + (1.7 * heightScale) / 2;
+    pillar.position.y = 0.24 + (1.75 * heightScale) / 2;
     pillar.castShadow = true;
     pillar.receiveShadow = true;
     this.towerGroup.add(pillar);
@@ -704,25 +785,31 @@ export class BuildPad {
       this.towerGroup.add(band);
     }
 
-    const topY = 0.24 + 1.7 * heightScale;
+    const topY = 0.24 + 1.75 * heightScale;
     this.turretHead = new THREE.Group();
     this.turretHead.position.set(0, topY + 0.45, 0);
     this.towerGroup.add(this.turretHead);
 
     if (this.towerType === 'crossbow') {
+      // 🔭 감시탑 (망루 지붕 + 정찰 석궁)
       const mount = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.55, 0.95), woodMat);
       mount.castShadow = true;
       this.turretHead.add(mount);
 
-      const bowArc = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.18, 0.22), accentMat);
-      bowArc.position.set(0, 0.18, 0.45);
+      const watchRoof = new THREE.Mesh(new THREE.ConeGeometry(1.15, 0.72, 6), accentMat);
+      watchRoof.position.set(0, 0.78, 0);
+      this.turretHead.add(watchRoof);
+
+      const bowArc = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.18, 0.22), goldMat);
+      bowArc.position.set(0, 0.18, 0.52);
       bowArc.castShadow = true;
       this.turretHead.add(bowArc);
 
       const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.22, 1.35), darkMetalMat);
       barrel.position.set(0, 0.22, 0.35);
       this.turretHead.add(barrel);
-    } else if (this.towerType === 'cannon') {
+    } else {
+      // 🏹 방어탑 (화력 포탑)
       const basecarriage = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.5, 1.05), woodMat);
       this.turretHead.add(basecarriage);
 
@@ -739,18 +826,6 @@ export class BuildPad {
       muzzleRing.rotation.x = Math.PI / 2 - 0.18;
       muzzleRing.position.set(0, 0.4, 1.0);
       this.turretHead.add(muzzleRing);
-    } else {
-      const crystalMat = makeLowPolyMaterial(0x38bdf8, {
-        emissive: 0x0284c7,
-        emissiveIntensity: 0.45,
-        roughness: 0.2,
-      });
-      const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.78, 0), crystalMat);
-      crystal.position.y = 0.38;
-      crystal.scale.set(0.85, 1.45, 0.85);
-      crystal.castShadow = true;
-      this.turretHead.add(crystal);
-      this.crystalMesh = crystal;
     }
   }
 
