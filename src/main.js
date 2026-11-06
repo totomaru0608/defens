@@ -2,12 +2,17 @@ import * as THREE from 'three';
 import {
   STAGES,
   TOWER_TYPES,
+  ENEMY_TYPES,
   PROP_CATALOG,
+  MAP_THEME_PRESETS,
+  ROAD_PATH_PRESETS,
   ANIMAL_MOTION_CONFIG,
   saveStages,
   setStagesList,
   resetStagesToDefault,
   createNewStageTemplate,
+  generateRandomRoadPath,
+  generateAutoPadsForPath,
 } from './stages.js';
 import { buildStageWorld, createTerrainPropMesh, MAP_BOUNDS } from './world.js';
 import {
@@ -69,10 +74,31 @@ const valScaleMult = document.getElementById('val-scale-mult');
 const edStageNameInput = document.getElementById('ed-stage-name');
 const edStartCoinsInput = document.getElementById('ed-start-coins');
 const edCastleHpInput = document.getElementById('ed-castle-hp');
+const edMapWaveBtn = document.getElementById('btn-ed-map-wave');
 const edAddStageBtn = document.getElementById('btn-ed-add-stage');
 const edDelStageBtn = document.getElementById('btn-ed-del-stage');
 const edResetAllBtn = document.getElementById('btn-ed-reset-all');
 const edPlayBtn = document.getElementById('btn-ed-play');
+
+// 스테이지 맵(테마·경로) & 적 웨이브 상세 에디터 DOM
+const mapWaveOverlayEl = document.getElementById('map-wave-overlay');
+const mwHeaderTitleEl = document.getElementById('mw-header-title');
+const mwApplyPlayBtn = document.getElementById('btn-mw-apply-play');
+const mwCloseBtn = document.getElementById('btn-mw-close');
+const mwThemePresetsEl = document.getElementById('mw-theme-presets');
+const mwRoadPresetsEl = document.getElementById('mw-road-presets');
+const mwColGround = document.getElementById('mw-col-ground');
+const mwColAlt = document.getElementById('mw-col-alt');
+const mwColRoad = document.getElementById('mw-col-road');
+const mwColBorder = document.getElementById('mw-col-border');
+const mwRandomRoadBtn = document.getElementById('btn-mw-random-road');
+const mwReverseRoadBtn = document.getElementById('btn-mw-reverse-road');
+const mwAutoPadsBtn = document.getElementById('btn-mw-auto-pads');
+const mwAddWpBtn = document.getElementById('btn-mw-add-wp');
+const mwWaypointListEl = document.getElementById('mw-waypoint-list');
+const mwWaveSummaryEl = document.getElementById('mw-wave-summary');
+const mwAddWaveBtn = document.getElementById('btn-mw-add-wave');
+const mwWavesListEl = document.getElementById('mw-waves-list');
 
 const edScaleBtn = document.getElementById('btn-ed-scale');
 const edRotateBtn = document.getElementById('btn-ed-rotate');
@@ -142,8 +168,11 @@ const editorState = {
   scaleIdx: 1,
   rotation: 0,
   previewGroup: new THREE.Group(),
+  waypointMarkersGroup: new THREE.Group(),
+  mapWaveOpen: false,
 };
 scene.add(editorState.previewGroup);
+scene.add(editorState.waypointMarkersGroup);
 
 // 게임 상태 관리
 const state = {
@@ -578,6 +607,9 @@ function loadStage(stageIndex, keepEditorOpen = false) {
   prepareWave(0);
   state.mode = 'playing';
   setEditorMode(keepEditorOpen, true);
+  if (editorState.mapWaveOpen) {
+    renderMapWaveStudio();
+  }
   showBanner(`STAGE ${state.stageIndex + 1} / ${STAGES.length}`, `${stageData.name} 방어 시작!`);
   updateHud();
 }
@@ -609,8 +641,89 @@ function prepareWave(waveIdx) {
 }
 
 // ==========================================================
-// 인게임 3D 스테이지 & 지형물 에디터 로직
+// 인게임 3D 스테이지 & 지형물 · 맵 · 웨이브 에디터 로직
 // ==========================================================
+
+function hexNumberToCss(num) {
+  return '#' + Math.max(0, Math.min(0xffffff, Number(num) || 0)).toString(16).padStart(6, '0');
+}
+
+function cssHexToNumber(hexStr) {
+  return parseInt(String(hexStr).replace('#', ''), 16) || 0x5cb346;
+}
+
+// 현재 스테이지의 3D 월드(들판·모래길·성채·지형물)만 즉시 재구축 (전투·타워 유지)
+function rebuildStageWorldInPlace() {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  if (state.world) {
+    scene.remove(state.world.worldGroup);
+  }
+  state.world = buildStageWorld(scene, stageData);
+  // 현재 이동 중인 적들의 길 곡선도 즉시 새 경로로 갱신
+  state.enemies.forEach((enemy) => {
+    enemy.roadCurve = state.world.roadCurve;
+  });
+  rebuildWaypointMarkers();
+}
+
+// 스테이지 전체 적 마릿수 재계산
+function recalculateTotalStageEnemies() {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  let totalCount = 0;
+  (stageData.waves || []).forEach((w) => {
+    (w.groups || []).forEach((g) => {
+      totalCount += Math.max(1, Number(g.count) || 1);
+    });
+  });
+  state.totalStageEnemies = Math.max(state.defeatedStageEnemies + state.enemies.length, totalCount);
+  updateHud();
+}
+
+// 에디터가 열려 있을 때 모래길 경유지(Waypoint) 3D 비콘 표시
+function rebuildWaypointMarkers() {
+  while (editorState.waypointMarkersGroup.children.length > 0) {
+    editorState.waypointMarkersGroup.remove(editorState.waypointMarkersGroup.children[0]);
+  }
+  if (!state.editorOpen) {
+    editorState.waypointMarkersGroup.visible = false;
+    return;
+  }
+  editorState.waypointMarkersGroup.visible = true;
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData || !Array.isArray(stageData.pathPoints)) return;
+
+  stageData.pathPoints.forEach(([px, pz], idx) => {
+    const isStart = idx === 0;
+    const isEnd = idx === stageData.pathPoints.length - 1;
+    const col = isStart ? 0xef4444 : isEnd ? 0x3b82f6 : 0xfacc15;
+    const beacon = new THREE.Group();
+    const pole = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.18, 0.25, 2.2, 8),
+      new THREE.MeshBasicMaterial({ color: col })
+    );
+    pole.position.y = 1.1;
+    beacon.add(pole);
+
+    const orb = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.55, 0),
+      new THREE.MeshBasicMaterial({ color: col })
+    );
+    orb.position.y = 2.4;
+    beacon.add(orb);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.75, 1.05, 18).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: col, side: THREE.DoubleSide })
+    );
+    ring.position.y = 0.16;
+    beacon.add(ring);
+
+    beacon.position.set(px, 0, pz);
+    editorState.waypointMarkersGroup.add(beacon);
+  });
+}
 
 function rebuildEditorGhostPreview() {
   while (editorState.previewGroup.children.length > 0) {
@@ -643,6 +756,20 @@ function rebuildEditorGhostPreview() {
     );
     padPreview.position.y = 0.14;
     editorState.previewGroup.add(padPreview);
+  } else if (brush === 'waypoint') {
+    const wpPreview = new THREE.Mesh(
+      new THREE.OctahedronGeometry(0.65, 0),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+    );
+    wpPreview.position.y = 1.6;
+    editorState.previewGroup.add(wpPreview);
+
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.9, 1.3, 20).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide })
+    );
+    ring.position.y = 0.18;
+    editorState.previewGroup.add(ring);
   } else {
     const propMesh = createTerrainPropMesh(brush, scale, editorState.rotation);
     editorState.previewGroup.add(propMesh);
@@ -669,8 +796,13 @@ function setEditorMode(enabled, silentBanner = false) {
     combatDockEl.classList.add('hidden');
 
     rebuildEditorGhostPreview();
+    rebuildWaypointMarkers();
     if (!silentBanner) {
-      showBanner('🛠️ 스테이지 & 지형 에디터', '전투 진행 중 실시간 지형물 배치 · 우클릭: 삭제', 2000);
+      showBanner(
+        '🛠️ 스테이지 & 맵·웨이브 에디터',
+        '지형물 배치 · 📍길경로점 편집 · 🗺️맵·웨이브 상세편집 가능',
+        2200
+      );
     }
   } else {
     editorBtnEl.classList.remove('active');
@@ -678,6 +810,8 @@ function setEditorMode(enabled, silentBanner = false) {
     editorDockEl.classList.add('hidden');
     combatDockEl.classList.remove('hidden');
     editorState.previewGroup.visible = false;
+    editorState.waypointMarkersGroup.visible = false;
+    toggleMapWaveStudio(false);
     if (state.player) state.player.targetMarker.visible = true;
   }
   updateHud();
@@ -730,7 +864,7 @@ edClearPropsBtn.addEventListener('click', () => {
   const stageData = STAGES[state.stageIndex];
   stageData.props = [];
   saveStages(STAGES);
-  loadStage(state.stageIndex, true);
+  rebuildStageWorldInPlace();
   showBanner('지형물 초기화', '현재 스테이지의 지형물을 모두 비웠습니다.', 1400);
 });
 
@@ -758,6 +892,7 @@ edAddStageBtn.addEventListener('click', () => {
   saveStages(STAGES);
   modalOverlayEl.classList.add('hidden');
   loadStage(STAGES.length - 1, state.editorOpen);
+  if (editorState.mapWaveOpen) renderMapWaveStudio();
   showBanner(
     `STAGE ${STAGES.length} 추가 및 출격!`,
     `${newStage.name} — 웨이브가 즉시 시작됩니다!`,
@@ -775,6 +910,7 @@ edDelStageBtn.addEventListener('click', () => {
   saveStages(STAGES);
   const nextIdx = Math.max(0, state.stageIndex - 1);
   loadStage(nextIdx, state.editorOpen);
+  if (editorState.mapWaveOpen) renderMapWaveStudio();
   showBanner('스테이지 삭제됨', `'${removedName}' 스테이지가 삭제되었습니다.`, 1600);
 });
 
@@ -782,8 +918,438 @@ edResetAllBtn.addEventListener('click', () => {
   const defaults = resetStagesToDefault();
   setStagesList(defaults);
   loadStage(0, state.editorOpen);
+  if (editorState.mapWaveOpen) renderMapWaveStudio();
   showBanner('기본값 복원 완료', `기본 ${STAGES.length}개 스테이지와 지형물로 복원되었습니다.`, 1800);
 });
+
+// ==========================================================
+// 스테이지 맵(테마·경로) & 적 웨이브 편성 상세 에디터 모달
+// ==========================================================
+
+function toggleMapWaveStudio(forceState) {
+  const next = typeof forceState === 'boolean' ? forceState : !editorState.mapWaveOpen;
+  editorState.mapWaveOpen = next;
+  mapWaveOverlayEl.classList.toggle('hidden', !next);
+  if (next) {
+    if (comfyStudio.isOpen) toggleComfyStudio(false);
+    renderMapWaveStudio();
+  }
+}
+
+edMapWaveBtn.addEventListener('click', () => {
+  toggleMapWaveStudio();
+});
+
+mwCloseBtn.addEventListener('click', () => {
+  toggleMapWaveStudio(false);
+});
+
+mwApplyPlayBtn.addEventListener('click', () => {
+  toggleMapWaveStudio(false);
+  setEditorMode(false);
+  loadStage(state.stageIndex, false);
+});
+
+// 테마 프리셋 버튼 초기 생성
+Object.entries(MAP_THEME_PRESETS).forEach(([key, preset]) => {
+  const btn = document.createElement('button');
+  btn.className = 'mw-preset-btn';
+  btn.textContent = preset.name;
+  btn.addEventListener('click', () => {
+    const stageData = STAGES[state.stageIndex];
+    if (!stageData) return;
+    stageData.groundColor = preset.groundColor;
+    stageData.groundAltColor = preset.groundAltColor;
+    stageData.roadColor = preset.roadColor;
+    stageData.roadBorderColor = preset.roadBorderColor;
+    saveStages(STAGES);
+    rebuildStageWorldInPlace();
+    renderMapWaveStudio();
+    sfx.playCoinPickup();
+    showBanner('맵 테마 변경', `${preset.name} 테마가 적용되었습니다!`, 1400);
+  });
+  mwThemePresetsEl.appendChild(btn);
+});
+
+// 모래길 모양 프리셋 버튼 초기 생성
+Object.entries(ROAD_PATH_PRESETS).forEach(([key, preset]) => {
+  const btn = document.createElement('button');
+  btn.className = 'mw-preset-btn';
+  btn.textContent = preset.name;
+  btn.addEventListener('click', () => {
+    const stageData = STAGES[state.stageIndex];
+    if (!stageData) return;
+    stageData.pathPoints = preset.points.map(([px, pz]) => [px, pz]);
+    saveStages(STAGES);
+    rebuildStageWorldInPlace();
+    renderMapWaveStudio();
+    sfx.playTowerBuilt();
+    showBanner('모래길 경로 변경', `${preset.name} 경로가 적용되었습니다!`, 1400);
+  });
+  mwRoadPresetsEl.appendChild(btn);
+});
+
+function onMapColorPickerChange() {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  stageData.groundColor = cssHexToNumber(mwColGround.value);
+  stageData.groundAltColor = cssHexToNumber(mwColAlt.value);
+  stageData.roadColor = cssHexToNumber(mwColRoad.value);
+  stageData.roadBorderColor = cssHexToNumber(mwColBorder.value);
+  saveStages(STAGES);
+  rebuildStageWorldInPlace();
+}
+
+mwColGround.addEventListener('input', onMapColorPickerChange);
+mwColAlt.addEventListener('input', onMapColorPickerChange);
+mwColRoad.addEventListener('input', onMapColorPickerChange);
+mwColBorder.addEventListener('input', onMapColorPickerChange);
+
+mwRandomRoadBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  stageData.pathPoints = generateRandomRoadPath();
+  saveStages(STAGES);
+  rebuildStageWorldInPlace();
+  renderMapWaveStudio();
+  sfx.playTowerBuilt();
+  showBanner('🎲 랜덤 모래길 생성', '새로운 구불구불한 모래길 경로가 생성되었습니다!', 1500);
+});
+
+mwReverseRoadBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData || !Array.isArray(stageData.pathPoints)) return;
+  stageData.pathPoints.reverse();
+  saveStages(STAGES);
+  rebuildStageWorldInPlace();
+  renderMapWaveStudio();
+  sfx.playCoinPickup();
+  showBanner('⇄ 경로 방향 반전', '적 출현 포털과 왕국 성채의 위치가 서로 바뀌었습니다!', 1500);
+});
+
+mwAutoPadsBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  stageData.buildPads = generateAutoPadsForPath(stageData.pathPoints, 7);
+  saveStages(STAGES);
+  rebuildPadsForCurrentStage();
+  sfx.playTowerBuilt();
+  showBanner('🏗️ 건설 구역 자동 배치', '현재 모래길 주변 최적 위치에 건설 구역이 재배치되었습니다!', 1600);
+});
+
+mwAddWpBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData || !Array.isArray(stageData.pathPoints)) return;
+  const pts = stageData.pathPoints;
+  if (pts.length >= 2) {
+    const last = pts[pts.length - 1];
+    const prev = pts[pts.length - 2];
+    const mx = Math.round(((last[0] + prev[0]) / 2) * 10) / 10;
+    const mz = Math.round(THREE.MathUtils.clamp((last[1] + prev[1]) / 2 + 5, -15, 15) * 10) / 10;
+    pts.splice(pts.length - 1, 0, [mx, mz]);
+  } else {
+    pts.push([0, 0]);
+  }
+  saveStages(STAGES);
+  rebuildStageWorldInPlace();
+  renderMapWaveStudio();
+  sfx.playCoinPickup();
+});
+
+mwAddWaveBtn.addEventListener('click', () => {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+  if (!Array.isArray(stageData.waves)) stageData.waves = [];
+  stageData.waves.push({
+    groups: [
+      { type: 'giraffe', count: 8, interval: 0.85, delay: 0 },
+      { type: 'hippo', count: 5, interval: 1.4, delay: 2.0 },
+      { type: 'elephant', count: 3, interval: 2.2, delay: 4.0 },
+    ],
+  });
+  saveStages(STAGES);
+  recalculateTotalStageEnemies();
+  renderMapWaveStudio();
+  sfx.playTowerBuilt();
+});
+
+function renderMapWaveStudio() {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData) return;
+
+  mwHeaderTitleEl.textContent = `🗺️ STAGE ${state.stageIndex + 1} (${stageData.name}) — 맵 & 웨이브 에디터`;
+
+  mwColGround.value = hexNumberToCss(stageData.groundColor ?? 0x5cb346);
+  mwColAlt.value = hexNumberToCss(stageData.groundAltColor ?? 0x4ea039);
+  mwColRoad.value = hexNumberToCss(stageData.roadColor ?? 0xead29c);
+  mwColBorder.value = hexNumberToCss(stageData.roadBorderColor ?? 0xc5aa72);
+
+  // 경유지(Waypoint) 리스트 렌더링
+  mwWaypointListEl.innerHTML = '';
+  (stageData.pathPoints || []).forEach((pt, idx) => {
+    const isStart = idx === 0;
+    const isEnd = idx === stageData.pathPoints.length - 1;
+    const row = document.createElement('div');
+    row.className = 'mw-wp-row';
+
+    const badge = document.createElement('span');
+    badge.className = 'mw-wp-badge';
+    badge.textContent = isStart ? `🚩 출발 #1` : isEnd ? `🏰 성채 #${idx + 1}` : `📍 경유 #${idx + 1}`;
+    row.appendChild(badge);
+
+    const coordWrap = document.createElement('div');
+    coordWrap.className = 'mw-wp-coord';
+
+    const xInput = document.createElement('input');
+    xInput.type = 'number';
+    xInput.step = '1';
+    xInput.min = String(MAP_BOUNDS.minX);
+    xInput.max = String(MAP_BOUNDS.maxX);
+    xInput.value = String(pt[0]);
+    xInput.addEventListener('change', () => {
+      pt[0] = THREE.MathUtils.clamp(parseFloat(xInput.value) || 0, MAP_BOUNDS.minX, MAP_BOUNDS.maxX);
+      saveStages(STAGES);
+      rebuildStageWorldInPlace();
+    });
+
+    const zInput = document.createElement('input');
+    zInput.type = 'number';
+    zInput.step = '1';
+    zInput.min = String(MAP_BOUNDS.minZ);
+    zInput.max = String(MAP_BOUNDS.maxZ);
+    zInput.value = String(pt[1]);
+    zInput.addEventListener('change', () => {
+      pt[1] = THREE.MathUtils.clamp(parseFloat(zInput.value) || 0, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ);
+      saveStages(STAGES);
+      rebuildStageWorldInPlace();
+    });
+
+    coordWrap.append('X:', xInput, 'Z:', zInput);
+    row.appendChild(coordWrap);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'mw-wp-del';
+    delBtn.textContent = '✕';
+    delBtn.title = '이 경유지 삭제 (최소 3개 유지)';
+    delBtn.addEventListener('click', () => {
+      if (stageData.pathPoints.length <= 3) {
+        showBanner('삭제 불가', '모래길은 최소 3개 이상의 경유지가 필요합니다.', 1400);
+        return;
+      }
+      stageData.pathPoints.splice(idx, 1);
+      saveStages(STAGES);
+      rebuildStageWorldInPlace();
+      renderMapWaveStudio();
+    });
+    row.appendChild(delBtn);
+
+    mwWaypointListEl.appendChild(row);
+  });
+
+  // 우측: 웨이브 및 적 그룹 리스트 렌더링
+  mwWavesListEl.innerHTML = '';
+  let totalStageCount = 0;
+  let totalEstCoins = 0;
+
+  const quickTypes = [
+    { type: 'giraffe', label: '+🦒 기린', count: 8, interval: 0.85 },
+    { type: 'hippo', label: '+🦛 하마', count: 5, interval: 1.35 },
+    { type: 'elephant', label: '+🐘 코끼리', count: 3, interval: 2.1 },
+    { type: 'imp', label: '+👹 돌격병', count: 10, interval: 0.75 },
+    { type: 'raider', label: '+⚔️ 전사', count: 7, interval: 1.0 },
+    { type: 'sprinter', label: '+🔥 기습병', count: 8, interval: 0.7 },
+    { type: 'brute', label: '+🛡️ 중장갑', count: 4, interval: 1.8 },
+    { type: 'boss', label: '+👑 보스', count: 1, interval: 5.0 },
+  ];
+
+  (stageData.waves || []).forEach((wave, wIdx) => {
+    if (!Array.isArray(wave.groups)) wave.groups = [];
+    let waveEnemyCount = 0;
+    wave.groups.forEach((g) => {
+      const c = Math.max(1, Number(g.count) || 1);
+      waveEnemyCount += c;
+      totalStageCount += c;
+      const eDef = ENEMY_TYPES[g.type] || ENEMY_TYPES.giraffe;
+      totalEstCoins += c * (eDef.coinReward || 12);
+    });
+
+    const card = document.createElement('div');
+    card.className = 'mw-wave-card';
+
+    const head = document.createElement('div');
+    head.className = 'mw-wave-head';
+
+    const title = document.createElement('div');
+    title.className = 'mw-wave-title';
+    title.innerHTML = `<span>🌊 WAVE ${wIdx + 1}</span><small>(총 ${waveEnemyCount}마리 출현)</small>`;
+    head.appendChild(title);
+
+    const actions = document.createElement('div');
+    actions.className = 'mw-wave-actions';
+
+    const testBtn = document.createElement('button');
+    testBtn.className = 'mw-test-wave-btn';
+    testBtn.textContent = '⚡ 이 웨이브 즉시 출격';
+    testBtn.addEventListener('click', () => {
+      toggleMapWaveStudio(false);
+      state.enemies.forEach((e) => e.destroy());
+      state.enemies = [];
+      prepareWave(wIdx);
+      state.mode = 'playing';
+      sfx.playTowerBuilt();
+      showBanner(`STAGE ${state.stageIndex + 1}`, `WAVE ${wIdx + 1} 즉시 테스트 출격!`, 1800);
+      updateHud();
+    });
+    actions.appendChild(testBtn);
+
+    const delWaveBtn = document.createElement('button');
+    delWaveBtn.className = 'mw-del-wave-btn';
+    delWaveBtn.textContent = '🗑️ 삭제';
+    delWaveBtn.addEventListener('click', () => {
+      if (stageData.waves.length <= 1) {
+        showBanner('삭제 불가', '스테이지에는 최소 1개의 웨이브가 있어야 합니다.', 1500);
+        return;
+      }
+      stageData.waves.splice(wIdx, 1);
+      saveStages(STAGES);
+      recalculateTotalStageEnemies();
+      if (state.waveIndex >= stageData.waves.length) {
+        prepareWave(0);
+      }
+      renderMapWaveStudio();
+    });
+    actions.appendChild(delWaveBtn);
+
+    head.appendChild(actions);
+    card.appendChild(head);
+
+    // 빠른 적 그룹 추가 바
+    const quickBar = document.createElement('div');
+    quickBar.className = 'mw-quick-enemy-bar';
+    quickTypes.forEach((qt) => {
+      const qBtn = document.createElement('button');
+      qBtn.className = 'mw-quick-add-btn';
+      qBtn.textContent = qt.label;
+      qBtn.addEventListener('click', () => {
+        wave.groups.push({
+          type: qt.type,
+          count: qt.count,
+          interval: qt.interval,
+          delay: wave.groups.length * 1.5,
+        });
+        saveStages(STAGES);
+        recalculateTotalStageEnemies();
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+        renderMapWaveStudio();
+        sfx.playCoinPickup();
+      });
+      quickBar.appendChild(qBtn);
+    });
+    card.appendChild(quickBar);
+
+    // 적 스폰 그룹 행 렌더링
+    const groupList = document.createElement('div');
+    groupList.className = 'mw-group-list';
+
+    wave.groups.forEach((group, gIdx) => {
+      const gRow = document.createElement('div');
+      gRow.className = 'mw-group-row';
+
+      const typeSelect = document.createElement('select');
+      Object.entries(ENEMY_TYPES).forEach(([eKey, eDef]) => {
+        const opt = document.createElement('option');
+        opt.value = eKey;
+        opt.textContent = `${eDef.emoji} ${eDef.name} (HP ${eDef.hp})`;
+        if (group.type === eKey) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+      typeSelect.addEventListener('change', () => {
+        group.type = typeSelect.value;
+        saveStages(STAGES);
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+        renderMapWaveStudio();
+      });
+      gRow.appendChild(typeSelect);
+
+      // 마릿수
+      const countField = document.createElement('label');
+      countField.className = 'mw-group-field';
+      const countInp = document.createElement('input');
+      countInp.type = 'number';
+      countInp.min = '1';
+      countInp.max = '80';
+      countInp.value = String(group.count);
+      countInp.addEventListener('change', () => {
+        group.count = Math.max(1, Math.min(80, parseInt(countInp.value, 10) || 1));
+        saveStages(STAGES);
+        recalculateTotalStageEnemies();
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+        renderMapWaveStudio();
+      });
+      countField.append('마릿수', countInp);
+      gRow.appendChild(countField);
+
+      // 스폰 간격(초)
+      const intField = document.createElement('label');
+      intField.className = 'mw-group-field';
+      const intInp = document.createElement('input');
+      intInp.type = 'number';
+      intInp.min = '0.2';
+      intInp.max = '10';
+      intInp.step = '0.1';
+      intInp.value = String(group.interval);
+      intInp.addEventListener('change', () => {
+        group.interval = Math.max(0.2, Math.min(10, parseFloat(intInp.value) || 1.0));
+        saveStages(STAGES);
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+      });
+      intField.append('간격(s)', intInp);
+      gRow.appendChild(intField);
+
+      // 시작 지연(초)
+      const delField = document.createElement('label');
+      delField.className = 'mw-group-field';
+      const delInp = document.createElement('input');
+      delInp.type = 'number';
+      delInp.min = '0';
+      delInp.max = '30';
+      delInp.step = '0.5';
+      delInp.value = String(group.delay);
+      delInp.addEventListener('change', () => {
+        group.delay = Math.max(0, Math.min(30, parseFloat(delInp.value) || 0));
+        saveStages(STAGES);
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+      });
+      delField.append('지연(s)', delInp);
+      gRow.appendChild(delField);
+
+      // 그룹 삭제 버튼
+      const rmBtn = document.createElement('button');
+      rmBtn.className = 'mw-wp-del';
+      rmBtn.textContent = '✕';
+      rmBtn.title = '이 적 그룹 삭제';
+      rmBtn.addEventListener('click', () => {
+        if (wave.groups.length <= 1) {
+          showBanner('삭제 불가', '웨이브당 최소 1개의 적 그룹이 필요합니다.', 1400);
+          return;
+        }
+        wave.groups.splice(gIdx, 1);
+        saveStages(STAGES);
+        recalculateTotalStageEnemies();
+        if (state.waveIndex === wIdx) prepareWave(wIdx);
+        renderMapWaveStudio();
+      });
+      gRow.appendChild(rmBtn);
+
+      groupList.appendChild(gRow);
+    });
+
+    card.appendChild(groupList);
+    mwWavesListEl.appendChild(card);
+  });
+
+  mwWaveSummaryEl.textContent = `총 ${(stageData.waves || []).length}웨이브 · 적 ${totalStageCount}마리 · 보상 약 🪙${totalEstCoins}`;
+}
 
 function eraseNearestAtPoint(worldPt) {
   const stageData = STAGES[state.stageIndex];
@@ -836,11 +1402,82 @@ function eraseNearestAtPoint(worldPt) {
   return false;
 }
 
+// 3D 맵에서 직접 모래길 경유지(Waypoint) 이동 / 추가 / 삭제 처리
+function handleWaypointBrushClick(x, z, isRightClick) {
+  const stageData = STAGES[state.stageIndex];
+  if (!stageData || !Array.isArray(stageData.pathPoints)) return;
+  const pts = stageData.pathPoints;
+  const targetVec = new THREE.Vector3(x, 0, z);
+
+  // 가장 가까운 기존 경유지 탐색
+  let nearestIdx = -1;
+  let nearestDist = 4.2;
+  pts.forEach(([px, pz], idx) => {
+    const d = Math.hypot(px - x, pz - z);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearestIdx = idx;
+    }
+  });
+
+  if (isRightClick) {
+    if (nearestIdx !== -1 && pts.length > 3) {
+      pts.splice(nearestIdx, 1);
+      saveStages(STAGES);
+      rebuildStageWorldInPlace();
+      if (editorState.mapWaveOpen) renderMapWaveStudio();
+      sfx.playEnemyDefeat();
+      spawnRingEffect(targetVec, 2.0, 0xef4444, 0.25);
+      spawnFloatingText(targetVec.clone().setY(2.2), `📍 경유지 #${nearestIdx + 1} 삭제`, '#f87171');
+    } else if (pts.length <= 3) {
+      showBanner('삭제 불가', '모래길은 최소 3개 이상의 경유지가 필요합니다.', 1400);
+    }
+    return;
+  }
+
+  // 좌클릭: 기존 경유지 근처면 위치 이동, 아니면 가장 가까운 선분 사이에 새 경유지 삽입
+  if (nearestIdx !== -1) {
+    pts[nearestIdx][0] = x;
+    pts[nearestIdx][1] = z;
+    saveStages(STAGES);
+    rebuildStageWorldInPlace();
+    if (editorState.mapWaveOpen) renderMapWaveStudio();
+    sfx.playCoinPickup();
+    spawnRingEffect(targetVec, 2.2, 0xfacc15, 0.25);
+    spawnFloatingText(targetVec.clone().setY(2.2), `📍 경유지 #${nearestIdx + 1} 이동!`, '#fde047');
+  } else {
+    // 가장 가까운 선분 찾기
+    let bestInsertIdx = pts.length - 1;
+    let bestSegDist = Infinity;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const mx = (pts[i][0] + pts[i + 1][0]) / 2;
+      const mz = (pts[i][1] + pts[i + 1][1]) / 2;
+      const d = Math.hypot(mx - x, mz - z);
+      if (d < bestSegDist) {
+        bestSegDist = d;
+        bestInsertIdx = i + 1;
+      }
+    }
+    pts.splice(bestInsertIdx, 0, [x, z]);
+    saveStages(STAGES);
+    rebuildStageWorldInPlace();
+    if (editorState.mapWaveOpen) renderMapWaveStudio();
+    sfx.playTowerBuilt();
+    spawnRingEffect(targetVec, 2.4, 0x38bdf8, 0.28);
+    spawnFloatingText(targetVec.clone().setY(2.2), `+📍 경유지 #${bestInsertIdx + 1} 추가!`, '#38bdf8');
+  }
+}
+
 function handleEditorCanvasClick(worldPt, isRightClick = false) {
   const stageData = STAGES[state.stageIndex];
   const x = Math.round(THREE.MathUtils.clamp(worldPt.x, MAP_BOUNDS.minX, MAP_BOUNDS.maxX) * 10) / 10;
   const z = Math.round(THREE.MathUtils.clamp(worldPt.z, MAP_BOUNDS.minZ, MAP_BOUNDS.maxZ) * 10) / 10;
   const targetVec = new THREE.Vector3(x, 0, z);
+
+  if (editorState.brush === 'waypoint') {
+    handleWaypointBrushClick(x, z, isRightClick);
+    return;
+  }
 
   if (isRightClick || editorState.brush === 'erase') {
     eraseNearestAtPoint(targetVec);
@@ -887,7 +1524,7 @@ function updateGroundRaycastFromMouse() {
   const hits = raycaster.intersectObject(state.world.raycastPlane);
   if (hits.length > 0) {
     currentGroundHit.copy(hits[0].point);
-    if (state.mode === 'playing' && state.player && !comfyStudio.isOpen) {
+    if (state.mode === 'playing' && state.player && !comfyStudio.isOpen && !editorState.mapWaveOpen) {
       state.player.setMoveTarget(currentGroundHit);
     }
     if (state.editorOpen) {
@@ -913,7 +1550,7 @@ canvasEl.addEventListener('contextmenu', (e) => {
 });
 
 canvasEl.addEventListener('pointerdown', (e) => {
-  if (comfyStudio.isOpen) return;
+  if (comfyStudio.isOpen || editorState.mapWaveOpen) return;
   const rect = canvasEl.getBoundingClientRect();
   mouseNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
   mouseNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;

@@ -603,6 +603,177 @@ export const PROP_CATALOG = {
   signpost: { name: '이정표', emoji: '🪧' },
 };
 
+// 에디터용 맵 지형 색상 테마 프리셋
+export const MAP_THEME_PRESETS = {
+  meadow: {
+    name: '🌿 초록 들판',
+    groundColor: 0x5cb346,
+    groundAltColor: 0x4ea039,
+    roadColor: 0xead29c,
+    roadBorderColor: 0xc5aa72,
+  },
+  savanna: {
+    name: '🌾 황혼 대평원',
+    groundColor: 0x65a30d,
+    groundAltColor: 0x4d7c0f,
+    roadColor: 0xfef08a,
+    roadBorderColor: 0xd97706,
+  },
+  emerald: {
+    name: '💎 에메랄드 고원',
+    groundColor: 0x10b981,
+    groundAltColor: 0x059669,
+    roadColor: 0xfde68a,
+    roadBorderColor: 0xb45309,
+  },
+  canyon: {
+    name: '🏜️ 사막 협곡',
+    groundColor: 0xd97706,
+    groundAltColor: 0xb45309,
+    roadColor: 0xfef3c7,
+    roadBorderColor: 0x92400e,
+  },
+  snow: {
+    name: '❄️ 만년설 요새',
+    groundColor: 0x93c5fd,
+    groundAltColor: 0x60a5fa,
+    roadColor: 0xf1f5f9,
+    roadBorderColor: 0x64748b,
+  },
+  volcanic: {
+    name: '🌋 암흑 화산지대',
+    groundColor: 0x3f6212,
+    groundAltColor: 0x365314,
+    roadColor: 0xfdba74,
+    roadBorderColor: 0x9a3412,
+  },
+};
+
+// 에디터용 모래길 경로(pathPoints) 프리셋
+export const ROAD_PATH_PRESETS = {
+  s_curve: {
+    name: '🐍 S자 굽잇길',
+    points: [
+      [-28, -11],
+      [-16, -9],
+      [-9, 6],
+      [2, 8],
+      [10, -6],
+      [19, -5],
+      [26, 8],
+    ],
+  },
+  zigzag: {
+    name: '⚡ 지그재그 협곡길',
+    points: [
+      [-29, 12],
+      [-18, 11],
+      [-12, -10],
+      [-1, -11],
+      [4, 10],
+      [16, 11],
+      [21, -7],
+      [27, -5],
+    ],
+  },
+  double_loop: {
+    name: '🌀 이중 루프 평원길',
+    points: [
+      [-29, -15],
+      [-22, 12],
+      [-11, 14],
+      [-9, -12],
+      [2, -13],
+      [4, 13],
+      [15, 12],
+      [17, -11],
+      [26, -6],
+      [28, 12],
+    ],
+  },
+  serpentine: {
+    name: '🐉 6단 구불길',
+    points: [
+      [-29, 13],
+      [-18, -14],
+      [-6, 13],
+      [5, -13],
+      [16, 13],
+      [24, -10],
+      [28, 12],
+    ],
+  },
+  grand_arch: {
+    name: '🌈 대형 아치 우회길',
+    points: [
+      [-28, 12],
+      [-19, -12],
+      [-5, -14],
+      [9, -14],
+      [20, -9],
+      [27, 11],
+    ],
+  },
+  blitz: {
+    name: '🏹 대각선 급습길',
+    points: [
+      [-28, -12],
+      [-14, -5],
+      [0, 2],
+      [14, -4],
+      [27, 10],
+    ],
+  },
+};
+
+// 랜덤 구불길 자동 생성 헬퍼
+export function generateRandomRoadPath() {
+  const numPts = 6 + Math.floor(Math.random() * 3); // 6~8점
+  const pts = [];
+  const startSign = Math.random() > 0.5 ? 1 : -1;
+  for (let i = 0; i < numPts; i++) {
+    const t = i / (numPts - 1);
+    const x = Math.round((-28 + t * 56) * 10) / 10;
+    const alt = (i % 2 === 0 ? 1 : -1) * startSign;
+    const zMag = 7 + Math.round(Math.random() * 7);
+    const z = Math.max(-15, Math.min(15, alt * zMag));
+    pts.push([x, z]);
+  }
+  return pts;
+}
+
+// 현재 길 경로(pathPoints) 주변에 건설 구역(buildPads) 자동 배치 헬퍼
+export function generateAutoPadsForPath(pathPoints, count = 6) {
+  if (!Array.isArray(pathPoints) || pathPoints.length < 2) return [];
+  const pads = [];
+  const innerCount = Math.min(count, Math.max(4, pathPoints.length));
+  for (let i = 0; i < innerCount; i++) {
+    const t = (i + 0.6) / innerCount;
+    const fIdx = t * (pathPoints.length - 1);
+    const i0 = Math.floor(fIdx);
+    const i1 = Math.min(pathPoints.length - 1, i0 + 1);
+    const frac = fIdx - i0;
+    const p0 = pathPoints[i0];
+    const p1 = pathPoints[i1];
+    const mx = p0[0] + (p1[0] - p0[0]) * frac;
+    const mz = p0[1] + (p1[1] - p0[1]) * frac;
+    const dx = p1[0] - p0[0];
+    const dz = p1[1] - p0[1];
+    const len = Math.hypot(dx, dz) || 1;
+    const side = i % 2 === 0 ? 1 : -1;
+    const nx = (-dz / len) * 5.2 * side;
+    const nz = (dx / len) * 5.2 * side;
+    const px = Math.round(Math.max(-26, Math.min(24, mx + nx)) * 10) / 10;
+    const pz = Math.round(Math.max(-15, Math.min(15, mz + nz)) * 10) / 10;
+    pads.push({
+      x: px,
+      z: pz,
+      baseCost: i < 2 ? 30 : i < 4 ? 35 : 40,
+    });
+  }
+  return pads;
+}
+
 export const TOWER_TYPES = {
   crossbow: {
     id: 'crossbow',

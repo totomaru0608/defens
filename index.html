@@ -98,6 +98,13 @@
                 <span>성채HP</span>
                 <input id="ed-castle-hp" type="number" min="50" max="999" step="10" />
               </label>
+              <button
+                id="btn-ed-map-wave"
+                class="ed-btn map-wave"
+                title="현재 스테이지의 맵 지형 테마·모래길 경로·적 웨이브 편성을 상세 편집합니다"
+              >
+                🗺️ 맵·웨이브 편집
+              </button>
               <button id="btn-ed-add-stage" class="ed-btn add" title="새 스테이지 추가">+ 스테이지 추가</button>
               <button id="btn-ed-del-stage" class="ed-btn danger" title="현재 스테이지 삭제">🗑️ 스테이지 삭제</button>
               <button id="btn-ed-reset-all" class="ed-btn" title="기본 스테이지 및 지형물로 초기화">↺ 기본값 복원</button>
@@ -160,6 +167,13 @@
               </button>
               <button class="brush-btn" data-brush="pad" title="타워 건설 구역(패드) 추가">
                 <span>🪙 건설구역</span>
+              </button>
+              <button
+                class="brush-btn waypoint-brush"
+                data-brush="waypoint"
+                title="좌클릭: 모래길 경유지(Waypoint) 이동/추가 · 우클릭: 경유지 삭제"
+              >
+                <span>📍 길경로점</span>
               </button>
               <div class="dock-sep"></div>
               <button class="brush-btn erase-btn" data-brush="erase" title="클릭한 지형물 또는 건설구역 삭제 (우클릭도 즉시 삭제)">
@@ -274,6 +288,93 @@
                     <span>워크플로우 상태:</span>
                     <strong id="comfy-status-text">실시간 리깅 동기화 완료 ✓</strong>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 스테이지 맵(테마·모래길 경로) & 적 웨이브 편성 상세 에디터 오버레이 -->
+        <div id="map-wave-overlay" class="comfy-overlay hidden">
+          <div class="comfy-window mw-window">
+            <div class="comfy-header">
+              <div class="comfy-title-group">
+                <span class="comfy-dot mw-dot"></span>
+                <strong id="mw-header-title">🗺️ 스테이지 맵 &amp; 웨이브 상세 에디터</strong>
+                <span class="comfy-sub">지형 테마 · 모래길 경로(Waypoint) · 적 웨이브 편성 실시간 편집</span>
+              </div>
+              <div class="comfy-header-actions">
+                <button id="btn-mw-apply-play" class="comfy-action-btn primary">
+                  ▶️ 적용 후 이 스테이지 처음부터 플레이
+                </button>
+                <button id="btn-mw-close" class="comfy-close-btn">✕ 닫기</button>
+              </div>
+            </div>
+
+            <div class="mw-studio-body">
+              <!-- 좌측 컬럼: 맵 테마 & 모래길 경로(Waypoint) 설정 -->
+              <div class="mw-column mw-map-col">
+                <div class="node-header node-blue">
+                  <span>🗺️ 1 · 맵 지형 테마 &amp; 색상</span>
+                  <span class="node-pin">TERRAIN ●</span>
+                </div>
+                <div class="mw-panel-content">
+                  <div class="mw-section-label">지형 테마 프리셋 (클릭 시 즉시 반영)</div>
+                  <div id="mw-theme-presets" class="mw-preset-grid"></div>
+
+                  <div class="mw-color-row">
+                    <label class="mw-color-item">
+                      <span>들판색</span>
+                      <input id="mw-col-ground" type="color" value="#5cb346" />
+                    </label>
+                    <label class="mw-color-item">
+                      <span>언덕색</span>
+                      <input id="mw-col-alt" type="color" value="#4ea039" />
+                    </label>
+                    <label class="mw-color-item">
+                      <span>모래길</span>
+                      <input id="mw-col-road" type="color" value="#ead29c" />
+                    </label>
+                    <label class="mw-color-item">
+                      <span>길테두리</span>
+                      <input id="mw-col-border" type="color" value="#c5aa72" />
+                    </label>
+                  </div>
+
+                  <div class="mw-divider"></div>
+
+                  <div class="mw-section-label">모래길 모양 프리셋 &amp; 자동 생성</div>
+                  <div id="mw-road-presets" class="mw-preset-grid"></div>
+
+                  <div class="mw-road-actions">
+                    <button id="btn-mw-random-road" class="mw-mini-btn">🎲 랜덤 구불길</button>
+                    <button id="btn-mw-reverse-road" class="mw-mini-btn">⇄ 출발·성채 반전</button>
+                    <button id="btn-mw-auto-pads" class="mw-mini-btn accent">🏗️ 건설구역 자동배치</button>
+                    <button id="btn-mw-add-wp" class="mw-mini-btn">+ 경유지 추가</button>
+                  </div>
+
+                  <div class="mw-section-label">
+                    모래길 경유지(Waypoint) 좌표 <small>(출발 포털 → 왕국 성채)</small>
+                  </div>
+                  <div id="mw-waypoint-list" class="mw-waypoint-list"></div>
+                </div>
+              </div>
+
+              <!-- 우측 컬럼: 스테이지 적 웨이브 & 군단 편성 -->
+              <div class="mw-column mw-wave-col">
+                <div class="node-header node-purple">
+                  <span>🌊 2 · 스테이지 적 웨이브 &amp; 출현 편성</span>
+                  <span id="mw-wave-summary" class="node-pin">총 3웨이브 · 적 0마리</span>
+                </div>
+                <div class="mw-panel-content mw-wave-content">
+                  <div class="mw-wave-toolbar">
+                    <span class="mw-wave-hint">
+                      각 웨이브별 출현할 적(코끼리·하마·기린·보스 등) 마릿수와 스폰 간격을 자유롭게 편집하세요.
+                    </span>
+                    <button id="btn-mw-add-wave" class="mw-add-wave-btn">+ 새 웨이브 추가</button>
+                  </div>
+
+                  <div id="mw-waves-list" class="mw-waves-list"></div>
                 </div>
               </div>
             </div>

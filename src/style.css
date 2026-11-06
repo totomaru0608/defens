@@ -943,3 +943,386 @@ body {
   transform: translateY(-2px) scale(1.03);
   box-shadow: 0 12px 26px rgba(245, 158, 11, 0.65);
 }
+
+/* ============================================================
+   스테이지 맵(테마·모래길 경로) & 적 웨이브 상세 에디터 스타일
+   ============================================================ */
+.ed-btn.map-wave {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+  border-color: #93c5fd;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.45);
+}
+
+.brush-btn.waypoint-brush.active {
+  background: rgba(245, 158, 11, 0.35);
+  border-color: #fbbf24;
+  color: #fef08a;
+}
+
+.mw-window {
+  width: min(980px, 92cqw);
+  max-height: 86cqh;
+  display: flex;
+  flex-direction: column;
+}
+
+.mw-dot {
+  background: #38bdf8;
+  box-shadow: 0 0 8px #38bdf8;
+}
+
+.mw-studio-body {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 1cqw;
+  padding: 1.3cqh 1.2cqw;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+
+.mw-column {
+  background: #232733;
+  border: 1.5px solid #4b5563;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.mw-panel-content {
+  padding: 1cqh 0.9cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75cqh;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.mw-section-label {
+  font-size: clamp(9.5px, 0.82cqw, 12px);
+  font-weight: 800;
+  color: #fde047;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mw-section-label small {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.mw-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
+
+.mw-preset-btn {
+  background: #141720;
+  color: #e2e8f0;
+  border: 1px solid #374151;
+  border-radius: 7px;
+  padding: 0.45cqh 0.4cqw;
+  font-size: clamp(9px, 0.78cqw, 11.5px);
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: all 0.12s ease;
+}
+
+.mw-preset-btn:hover {
+  background: #1e293b;
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+.mw-color-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+
+.mw-color-item {
+  background: #141720;
+  border: 1px solid #374151;
+  border-radius: 7px;
+  padding: 0.35cqh 0.4cqw;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  color: #cbd5e1;
+  font-weight: 700;
+}
+
+.mw-color-item input[type='color'] {
+  width: 22px;
+  height: 18px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.mw-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0.2cqh 0;
+}
+
+.mw-road-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+
+.mw-mini-btn {
+  background: #1f2937;
+  color: #f8fafc;
+  border: 1px solid #4b5563;
+  border-radius: 7px;
+  padding: 0.45cqh 0.5cqw;
+  font-size: clamp(9px, 0.78cqw, 11.5px);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mw-mini-btn:hover {
+  background: #334155;
+  border-color: #93c5fd;
+}
+
+.mw-mini-btn.accent {
+  background: rgba(22, 163, 74, 0.28);
+  border-color: #4ade80;
+  color: #bbf7d0;
+}
+
+.mw-waypoint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-height: 18cqh;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.mw-wp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  background: #141720;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+}
+
+.mw-wp-badge {
+  font-weight: 800;
+  color: #38bdf8;
+  min-width: 54px;
+}
+
+.mw-wp-coord {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #94a3b8;
+}
+
+.mw-wp-coord input {
+  width: 44px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  font-weight: 700;
+  text-align: center;
+}
+
+.mw-wp-del {
+  background: rgba(185, 28, 28, 0.35);
+  color: #fecaca;
+  border: 1px solid #f87171;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+/* 우측 웨이브 편집 영역 */
+.mw-wave-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6cqw;
+}
+
+.mw-wave-hint {
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  color: #cbd5e1;
+}
+
+.mw-add-wave-btn {
+  background: linear-gradient(135deg, #16a34a, #15803d);
+  color: #ffffff;
+  border: 1px solid #4ade80;
+  border-radius: 8px;
+  padding: 0.5cqh 0.85cqw;
+  font-size: clamp(9.5px, 0.82cqw, 12px);
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mw-waves-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8cqh;
+  overflow-y: auto;
+  flex: 1;
+  padding-right: 2px;
+}
+
+.mw-wave-card {
+  background: #161922;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  padding: 0.7cqh 0.75cqw;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55cqh;
+}
+
+.mw-wave-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 0.4cqh;
+}
+
+.mw-wave-title {
+  font-size: clamp(10px, 0.88cqw, 13px);
+  font-weight: 900;
+  color: #fef08a;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mw-wave-title small {
+  color: #93c5fd;
+  font-weight: 700;
+}
+
+.mw-wave-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mw-test-wave-btn {
+  background: rgba(37, 99, 235, 0.35);
+  color: #bfdbfe;
+  border: 1px solid #60a5fa;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mw-del-wave-btn {
+  background: rgba(185, 28, 28, 0.35);
+  color: #fecaca;
+  border: 1px solid #f87171;
+  border-radius: 6px;
+  padding: 2px 7px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.mw-quick-enemy-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.mw-quick-add-btn {
+  background: #232733;
+  color: #e2e8f0;
+  border: 1px solid #4b5563;
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: clamp(8.5px, 0.74cqw, 10.5px);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mw-quick-add-btn:hover {
+  background: #374151;
+  border-color: #fde047;
+  color: #fef08a;
+}
+
+.mw-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mw-group-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr auto;
+  align-items: center;
+  gap: 4px;
+  background: #1f2430;
+  border: 1px solid #334155;
+  border-radius: 7px;
+  padding: 3px 6px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+}
+
+.mw-group-row select {
+  background: #0f172a;
+  color: #fef08a;
+  border: 1px solid #475569;
+  border-radius: 5px;
+  padding: 2px 4px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  font-weight: 800;
+}
+
+.mw-group-field {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: #cbd5e1;
+  white-space: nowrap;
+}
+
+.mw-group-field input {
+  width: 42px;
+  background: #0f172a;
+  color: #ffffff;
+  border: 1px solid #475569;
+  border-radius: 4px;
+  padding: 1px 3px;
+  font-size: clamp(8.5px, 0.75cqw, 11px);
+  font-weight: 800;
+  text-align: center;
+}
